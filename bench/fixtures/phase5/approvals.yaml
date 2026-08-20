@@ -1,0 +1,7 @@
+cases:
+  - {id: approved, outcome: approved}
+  - {id: rejected, outcome: rejected}
+  - {id: evidence, outcome: pending}
+  - {id: cosign, outcome: approved}
+  - {id: expired-waiver, outcome: pending}
+  - {id: unavailable, outcome: pending}

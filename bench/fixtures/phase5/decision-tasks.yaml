@@ -1,0 +1,13 @@
+tasks:
+  - {id: block-1, expected: BLOCK, tests: true, approvers: [], cosigns: 1, waiver: false}
+  - {id: block-2, expected: BLOCK, tests: false, approvers: [], cosigns: 1, waiver: false}
+  - {id: block-3, expected: BLOCK, tests: true, approvers: [], cosigns: 1, waiver: false}
+  - {id: block-4, expected: BLOCK, tests: false, approvers: [], cosigns: 1, waiver: false}
+  - {id: tests-1, expected: ALLOW_WITH_TESTS, tests: false, approvers: [], cosigns: 1, waiver: false}
+  - {id: tests-2, expected: ALLOW_WITH_TESTS, tests: false, approvers: [], cosigns: 1, waiver: false}
+  - {id: tests-3, expected: ALLOW_WITH_TESTS, tests: false, approvers: [], cosigns: 1, waiver: false}
+  - {id: approval-1, expected: REQUIRE_APPROVAL, tests: true, approvers: [coupon_platform], cosigns: 1, waiver: true}
+  - {id: approval-2, expected: REQUIRE_APPROVAL, tests: true, approvers: [coupon_platform], cosigns: 2, waiver: false}
+  - {id: approval-3, expected: REQUIRE_APPROVAL, tests: true, approvers: [coupon_platform, merchant_checkout], cosigns: 2, waiver: true}
+  - {id: allow-1, expected: ALLOW, tests: true, approvers: [], cosigns: 1, waiver: false}
+  - {id: allow-2, expected: ALLOW, tests: true, approvers: [], cosigns: 1, waiver: false}

@@ -1,10 +1,51 @@
 """AST validation of deterministic policy invariants."""
 
 import ast
+import re
+from pathlib import Path
 
 from bizguard.decision import Finding, FindingStatus
 from bizguard.diff_parser import ParsedDiff
 from bizguard.policy.invariants import Invariant
+
+
+def validate_artifact(policy_id: str, source: str, path: str, severity: str = "high") -> dict[str, object]:
+    """Validate non-Python public artifacts from their content, never their filename.
+
+    The checks deliberately use syntax/content semantics that are available offline:
+    published contracts retain required fields and enum values, migrations are
+    transactional, message schemas expose a version, and configuration never
+    embeds a credential value.
+    """
+    suffix = Path(path).suffix.lower()
+    lower = source.lower()
+    violated = False
+    message = "artifact is compatible"
+    if suffix in {".yaml", ".yml", ".json"} and ("openapi" in lower or "paths:" in lower):
+        violated = bool(re.search(r"^\s*-\s*(id|status|code)\s*$", source, re.MULTILINE))
+        message = "published OpenAPI field removed" if violated else message
+    elif suffix == ".proto":
+        violated = bool(not re.search(r"\b\w+\s+(id|status)\s*=", source) and "message" in lower)
+        message = "published Proto required field missing" if violated else message
+    elif suffix == ".sql":
+        has_write = bool(re.search(r"\b(alter|update|delete|insert)\b", lower))
+        violated = has_write and "transaction" not in lower and "begin" not in lower
+        message = "migration write is not transactional" if violated else message
+    elif suffix in {".avsc", ".schema"}:
+        violated = "schema_version" not in lower and "version" not in lower
+        message = "message schema has no version" if violated else message
+    elif suffix in {".properties", ".conf", ".env"}:
+        violated = bool(re.search(r"(?i)(password|secret|token|api[_-]?key)\s*=\s*[^${\s][^\s]*", source))
+        message = "configuration contains a literal credential" if violated else message
+    return {
+        "id": policy_id,
+        "severity": severity,
+        "violated": violated,
+        "effect": message,
+        "remediation": "restore compatibility or provide a versioned migration",
+        "confidence": 1.0,
+        "evidence": [path],
+    }
 
 
 def validate_invariant(

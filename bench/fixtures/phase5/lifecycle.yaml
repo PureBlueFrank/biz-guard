@@ -1,0 +1,2 @@
+promotion_gates: {min_samples: 3, max_false_positive_rate: 0.0}
+transitions: [draft, shadow, warning, blocking, warning]

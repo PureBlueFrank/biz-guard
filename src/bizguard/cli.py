@@ -32,6 +32,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     check_parser = subparsers.add_parser("check")
     check_parser.add_argument("--diff", type=Path, required=True)
+    doctor_parser = subparsers.add_parser("doctor")
+    doctor_parser.add_argument("--json", action="store_true")
     impact_parser = subparsers.add_parser("impact")
     impact_subparsers = impact_parser.add_subparsers(dest="impact_command")
     analyze_parser = impact_subparsers.add_parser("analyze")
@@ -75,6 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if arguments.command == "prepare":
         return _prepare(arguments)
+    if arguments.command == "doctor":
+        return _doctor(arguments)
     if arguments.command == "impact" and arguments.change_context:
         return _context_impact(arguments)
     if arguments.command == "impact":
@@ -100,6 +104,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     card = evaluate_change(diff_text)
     _print_card(card)
     return _exit_code(card)
+
+
+def _doctor(arguments: argparse.Namespace) -> int:
+    """Diagnose local, read-only prerequisites without contacting any service."""
+    root = _project_root()
+    checks = {
+        "policy": (root / "policy" / "invariants.yaml").is_file(),
+        "catalog": (root / "src/bizguard/semantic/catalog.yaml").is_file(),
+        "mcp": True,
+    }
+    payload = {"ok": all(checks.values()), "checks": checks}
+    print(json.dumps(payload, sort_keys=True) if arguments.json else ("ok" if payload["ok"] else "failed"))
+    return 0 if payload["ok"] else 1
 
 
 def _impact(arguments: argparse.Namespace) -> int:

@@ -1,0 +1,14 @@
+version: phase5-v1
+tasks:
+  - {id: critical-ledger-1, truth: block, critical: true, impact: true, prompt: "check ledger ordering"}
+  - {id: critical-ledger-2, truth: block, critical: true, impact: true, prompt: "check failure semantics"}
+  - {id: critical-key-1, truth: block, critical: true, impact: false, prompt: "check idempotency consumption"}
+  - {id: critical-dto-1, truth: block, critical: true, impact: true, prompt: "check published contract"}
+  - {id: tests-1, truth: tests, critical: false, impact: true, prompt: "run required tests"}
+  - {id: tests-2, truth: tests, critical: false, impact: false, prompt: "run migration tests"}
+  - {id: tests-3, truth: tests, critical: false, impact: true, prompt: "run API tests"}
+  - {id: approval-1, truth: approval, critical: false, impact: true, prompt: "inspect public API"}
+  - {id: approval-2, truth: approval, critical: false, impact: false, prompt: "inspect unknown boundary"}
+  - {id: approval-3, truth: approval, critical: false, impact: true, prompt: "inspect owners"}
+  - {id: allow-1, truth: allow, critical: false, impact: false, prompt: "inspect private refactor"}
+  - {id: allow-2, truth: allow, critical: false, impact: false, prompt: "inspect docs"}
