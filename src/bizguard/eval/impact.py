@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from collections import deque
 from collections.abc import Sequence
 import json
 from pathlib import Path
@@ -19,7 +18,6 @@ from bizguard.domain.models import Evidence
 def evaluate(dataset: Path, graph: Path) -> dict[str, object]:
     tasks = (yaml.safe_load(dataset.read_text(encoding="utf-8")) or {}).get("tasks", [])
     snapshot = GraphSnapshot.from_dict(json.loads(graph.read_text(encoding="utf-8")))
-    ids = {node.id for node in snapshot.nodes}
     edge_ids = {edge.id for edge in snapshot.edges}
     failures: list[str] = []
     complete = 0
@@ -36,10 +34,11 @@ def evaluate(dataset: Path, graph: Path) -> dict[str, object]:
         independent = _independent_shortest_path(snapshot, changed_id)
         if independent != expected_path:
             failures.append(f"{task['id']}: golden shortest path differs from independent BFS")
-        missing_nodes = set(task["expected_nodes"]) - ids
+        if not _matches_expected_nodes(result.path, task["expected_nodes"]):
+            failures.append(f"{task['id']}: analyzer nodes differ from golden")
         missing_edges = set(task.get("expected_edges", [])) - edge_ids
-        if missing_nodes or missing_edges:
-            failures.append(f"{task['id']}: missing nodes={sorted(missing_nodes)} edges={sorted(missing_edges)}")
+        if missing_edges:
+            failures.append(f"{task['id']}: missing edges={sorted(missing_edges)}")
         if _complete_evidence(result.evidence, snapshot.revision):
             complete += 1
         else:
@@ -76,6 +75,9 @@ def changed_id_from_diff_text(snapshot: GraphSnapshot, text: str, label: str = "
     repo, _, relative = repo_path.partition("/")
     prefix = f"repo://{repo}/{relative}#"
     proto_prefix = "proto://" if relative.endswith(".proto") else prefix
+    added_routes = re.findall(r'^\+.*?["\'](/[^"\']+)["\']', text, re.MULTILINE)
+    if added_routes:
+        return f"unindexed-route://{repo}{added_routes[0]}"
     removed = "\n".join(line[1:] for line in text.splitlines() if line.startswith("-") and not line.startswith("---"))
     tokens = set(re.findall(r"[A-Za-z][A-Za-z0-9_]*", removed))
     candidates = [node.id for node in snapshot.nodes if node.id.startswith(proto_prefix)]
@@ -87,7 +89,15 @@ def changed_id_from_diff_text(snapshot: GraphSnapshot, text: str, label: str = "
             identifier,
         ),
     )
-    if not ranked or not any(token in ranked[0] for token in tokens):
+    if not ranked:
+        raise ValueError(f"{label}: diff has no indexed changed artifact")
+    if not any(token in ranked[0] for token in tokens):
+        dynamic = [
+            identifier for identifier in candidates
+            if next(node for node in snapshot.nodes if node.id == identifier).properties.get("dynamic") == "true"
+        ]
+        if dynamic:
+            return min(dynamic, key=lambda identifier: (len(identifier), identifier))
         raise ValueError(f"{label}: diff has no indexed changed artifact")
     return ranked[0]
 
@@ -105,28 +115,26 @@ def _independent_shortest_path(snapshot: GraphSnapshot, start: str) -> list[str]
         if edge.kind in semantic_kinds | later_kinds:
             adjacency.setdefault(edge.source_id, []).append(edge)
             adjacency.setdefault(edge.target_id, []).append(edge)
-    queue: deque[tuple[list[str], bool]] = deque([([start], False)])
-    seen = {(start, False)}
-    while queue:
-        path, crossed_boundary = queue.popleft()
+    candidates: list[list[str]] = []
+
+    def visit(path: list[str], crossed_boundary: bool) -> None:
         node = path[-1]
         if crossed_boundary and len(path) > 1 and node.startswith(("capability://", "invariant://", "owner://")):
-            return path
+            candidates.append(path)
+            return
         for edge in sorted(adjacency.get(node, []), key=lambda item: item.id):
             if edge.kind in later_kinds and not crossed_boundary:
                 continue
             next_node = edge.target_id if edge.source_id == node else edge.source_id
-            if next_node == start:
+            if next_node in path:
                 continue
-            next_crossed_boundary = crossed_boundary or edge.kind in semantic_kinds
-            state = (next_node, next_crossed_boundary)
-            if state not in seen:
-                seen.add(state)
-                queue.append(([ *path, next_node], next_crossed_boundary))
-    start_node = next((item for item in snapshot.nodes if item.id == start), None)
-    if start_node is not None and start_node.properties.get("dynamic") == "true":
-        return [start, "UNKNOWN_BOUNDARY"]
-    return [start]
+            visit([*path, next_node], crossed_boundary or edge.kind in semantic_kinds)
+
+    if any(node.id == start for node in snapshot.nodes):
+        visit([start], False)
+    if candidates:
+        return min(candidates, key=lambda path: (len(path), path))
+    return [start, "UNKNOWN_BOUNDARY"]
 
 
 def _connected(path: list[str], edges: list[GraphEdge]) -> bool:
@@ -145,7 +153,7 @@ def _complete_evidence(evidence: Sequence[Evidence], revision: str) -> bool:
 
 
 def _matches_expected_evidence(evidence: Sequence[Evidence], expected: object) -> bool:
-    if not isinstance(expected, list):
+    if not isinstance(expected, list) or not expected:
         return False
     actual = {
         (getattr(item, "source"), getattr(item, "confidence"), getattr(item, "revision"), getattr(item, "evidence_uri"))
@@ -156,6 +164,10 @@ def _matches_expected_evidence(evidence: Sequence[Evidence], expected: object) -
         and (item.get("source"), item.get("confidence"), item.get("revision"), item.get("evidence_uri")) in actual
         for item in expected
     )
+
+
+def _matches_expected_nodes(path: Sequence[str], expected: object) -> bool:
+    return isinstance(expected, list) and set(path) == set(expected)
 
 
 def main() -> int:

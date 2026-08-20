@@ -45,10 +45,12 @@ def index(repos: Path, revision: str) -> GraphSnapshot:
                 facts.append((repo, path, fact))
                 if fact.kind == "parameter":
                     continue
+                if fact.kind == "call":
+                    node(fact.node_id, NodeKind.CODE, fact.name)
+                    continue
                 kind = NodeKind.INTERFACE if fact.kind == "field" else NodeKind.CODE
                 node(fact.node_id, kind, fact.name)
-                if fact.kind != "call":
-                    edge(repository_id, fact.node_id, EdgeKind.DECLARES, fact.evidence_uri)
+                edge(repository_id, fact.node_id, EdgeKind.DECLARES, fact.evidence_uri)
         for contract in repo_dir.rglob("*.yaml"):
             for contract_fact in analyze_openapi(contract, repo, revision):
                 node(contract_fact.node_id, NodeKind.INTERFACE, contract_fact.name)
@@ -145,6 +147,7 @@ def _add_business_nodes(nodes: dict[str, GraphNode], node: object, edge: object)
             edge(identifier, capability, EdgeKind.BELONGS_TO_CAPABILITY, "catalog://semantic/catalog.yaml#coupon_redemption", "catalog")  # type: ignore[operator]
     edge(capability, owner, EdgeKind.OWNED_BY, "catalog://semantic/catalog.yaml#coupon_redemption", "catalog")  # type: ignore[operator]
     edge(invariant, capability, EdgeKind.BELONGS_TO_CAPABILITY, "catalog://semantic/catalog.yaml#redeem_idempotency_key_required", "catalog")  # type: ignore[operator]
+    edge(capability, invariant, EdgeKind.PROTECTED_BY, "catalog://semantic/catalog.yaml#redeem_idempotency_key_required", "catalog")  # type: ignore[operator]
 
 
 def _kind_for_id(identifier: str) -> NodeKind:

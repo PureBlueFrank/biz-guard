@@ -27,12 +27,13 @@ class ImpactResult:
     path: list[str]
     evidence: list[Evidence]
     unknown_boundary: bool = False
+    unknown_reason: str | None = None
 
 
 def analyze(snapshot: GraphSnapshot, changed_id: str, revision: str) -> ImpactResult:
     """Find the shortest real graph route from a changed node to a business terminal."""
     if snapshot.revision != revision or changed_id not in {node.id for node in snapshot.nodes}:
-        return ImpactResult(_empty_layers(), [changed_id], [], False)
+        return _unknown_result(snapshot, changed_id, "NO_INDEXED_ROUTE")
 
     path_edges = _shortest_terminal_path(snapshot, changed_id)
     if path_edges:
@@ -42,18 +43,8 @@ def analyze(snapshot: GraphSnapshot, changed_id: str, revision: str) -> ImpactRe
         return ImpactResult(_layers(path, path_edges), path, _evidence(path_edges))
 
     node = next(item for item in snapshot.nodes if item.id == changed_id)
-    if node.properties.get("dynamic") == "true" and not _has_semantic_continuation(snapshot, changed_id):
-        evidence_uri = node.properties.get("boundary_evidence_uri")
-        evidence = (
-            [Evidence(
-                id=f"boundary:{changed_id}", source="manual", confidence=1.0,
-                revision=snapshot.revision, evidence_uri=evidence_uri,
-            )]
-            if evidence_uri
-            else []
-        )
-        return ImpactResult(_empty_layers(changed_id), [changed_id, "UNKNOWN_BOUNDARY"], evidence, True)
-    return ImpactResult(_empty_layers(changed_id), [changed_id], [], False)
+    reason = "DYNAMIC_BOUNDARY" if node.properties.get("dynamic") == "true" else "NO_INDEXED_ROUTE"
+    return _unknown_result(snapshot, changed_id, reason, node.properties.get("boundary_evidence_uri"))
 
 
 def _shortest_terminal_path(snapshot: GraphSnapshot, start: str) -> list[GraphEdge]:
@@ -86,10 +77,19 @@ def _other_end(edge: GraphEdge, node: str) -> str:
     return edge.target_id if edge.source_id == node else edge.source_id
 
 
-def _has_semantic_continuation(snapshot: GraphSnapshot, node_id: str) -> bool:
-    return any(
-        edge.kind in _SEMANTIC_CONTINUATIONS and node_id in {edge.source_id, edge.target_id}
-        for edge in snapshot.edges
+def _unknown_result(
+    snapshot: GraphSnapshot, changed_id: str, reason: str, evidence_uri: str | None = None
+) -> ImpactResult:
+    uri = evidence_uri or f"graph://{snapshot.revision}/nodes/{changed_id}"
+    source = "manual" if evidence_uri else "analysis"
+    evidence = [
+        Evidence(
+            id=f"boundary:{changed_id}", source=source, confidence=1.0,
+            revision=snapshot.revision, evidence_uri=uri,
+        )
+    ]
+    return ImpactResult(
+        _empty_layers(changed_id), [changed_id, "UNKNOWN_BOUNDARY"], evidence, True, reason
     )
 
 
