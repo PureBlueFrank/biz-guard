@@ -1,0 +1,36 @@
+{
+  "id": "stale-revision-01-context",
+  "base_revision": "semantic-seed-v1",
+  "diff_uri": "repo://bizguard/bench/fixtures/phase1/stale-revision-01.diff",
+  "artifacts": [
+    {
+      "id": "stale-revision-01-artifact",
+      "uri": "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+      "status": "modified",
+      "revision": "semantic-seed-v1",
+      "evidence": [
+        {
+          "id": "stale-revision-01-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "stale-semantic-seed-v0",
+          "evidence_uri": "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+          "level": "UNKNOWN"
+        }
+      ]
+    }
+  ],
+  "visible_knowledge_ids": [
+    "adr-coupon-idempotency"
+  ],
+  "evidence": [
+    {
+      "id": "stale-revision-01-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "stale-semantic-seed-v0",
+      "evidence_uri": "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+      "level": "UNKNOWN"
+    }
+  ]
+}

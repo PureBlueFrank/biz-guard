@@ -1,0 +1,34 @@
+{
+  "id": "ledger-state-01-context",
+  "base_revision": "semantic-seed-v1",
+  "diff_uri": "repo://bizguard/bench/fixtures/phase1/ledger-state-01.diff",
+  "artifacts": [
+    {
+      "id": "ledger-state-01-artifact",
+      "uri": "db://coupon-core/coupon_redemption#status",
+      "status": "modified",
+      "revision": "semantic-seed-v1",
+      "evidence": [
+        {
+          "id": "ledger-state-01-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "db://coupon-core/coupon_redemption#status",
+          "level": "FACT"
+        }
+      ]
+    }
+  ],
+  "visible_knowledge_ids": ["field-ledger-status", "postmortem-double-redeem"],
+  "evidence": [
+    {
+      "id": "ledger-state-01-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "db://coupon-core/coupon_redemption#status",
+      "level": "FACT"
+    }
+  ]
+}

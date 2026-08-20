@@ -1,0 +1,17 @@
+{
+  "id": "idempotency-order-02-impact",
+  "node_ids": [
+    "repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem",
+    "db://coupon-core/coupon_redemption#status"
+  ],
+  "evidence": [
+    {
+      "id": "idempotency-order-02-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem",
+      "level": "FACT"
+    }
+  ]
+}

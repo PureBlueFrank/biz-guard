@@ -1,0 +1,7 @@
+version: 2
+policies:
+  - id: coupon-redemption-idempotency-key
+    lifecycle: active
+    mode: blocking
+    grandfathered_evidence: p0-fixtures-v1
+    evidence_uri: repo://bizguard/policy/invariants.yaml#redeem-must-check-idempotency-in-transaction

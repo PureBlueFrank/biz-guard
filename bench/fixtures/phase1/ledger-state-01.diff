@@ -1,0 +1,9 @@
+diff --git a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java
+--- a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java
++++ b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java
+@@ -16,7 +16,7 @@ public final class RedeemService {
+         CouponRedemption redemption = new CouponRedemption(request.idempotencyKey(), "PENDING");
+         try {
+-            redemption = repository.save(new CouponRedemption(request.idempotencyKey(), "SUCCEEDED"));
++            redemption = repository.save(new CouponRedemption(request.idempotencyKey(), "FAILED"));
+             producer.publish(redemption);

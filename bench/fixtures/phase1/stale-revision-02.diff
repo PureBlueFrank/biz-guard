@@ -1,0 +1,6 @@
+diff --git a/knowledge/adr-coupon-idempotency.md b/knowledge/adr-coupon-idempotency.md
+--- a/knowledge/adr-coupon-idempotency.md
++++ b/knowledge/adr-coupon-idempotency.md
+@@ -5,3 +5,3 @@
+-Use one idempotency key per redemption.
++Use a revision-pinned idempotency key per redemption.

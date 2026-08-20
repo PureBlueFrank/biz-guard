@@ -1,0 +1,34 @@
+{
+  "id": "idempotency-order-02-context",
+  "base_revision": "semantic-seed-v1",
+  "diff_uri": "repo://bizguard/bench/fixtures/phase1/idempotency-order-02.diff",
+  "artifacts": [
+    {
+      "id": "idempotency-order-02-artifact",
+      "uri": "repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem",
+      "status": "modified",
+      "revision": "semantic-seed-v1",
+      "evidence": [
+        {
+          "id": "idempotency-order-02-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem",
+          "level": "FACT"
+        }
+      ]
+    }
+  ],
+  "visible_knowledge_ids": ["adr-coupon-idempotency"],
+  "evidence": [
+    {
+      "id": "idempotency-order-02-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem",
+      "level": "FACT"
+    }
+  ]
+}

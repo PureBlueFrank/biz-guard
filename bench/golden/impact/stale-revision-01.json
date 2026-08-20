@@ -1,0 +1,18 @@
+{
+  "id": "stale-revision-01-impact",
+  "node_ids": [
+    "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+    "db://coupon-core/coupon_redemption#status"
+  ],
+  "evidence": [
+    {
+      "id": "stale-revision-01-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "stale-semantic-seed-v0",
+      "evidence_uri": "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+      "level": "UNKNOWN"
+    }
+  ],
+  "unknown_reason": "REVISION_MISMATCH"
+}

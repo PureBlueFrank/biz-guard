@@ -1,0 +1,8 @@
+diff --git a/fixtures/java-microservices/coupon-contract/src/main/resources/openapi.yaml b/fixtures/java-microservices/coupon-contract/src/main/resources/openapi.yaml
+--- a/fixtures/java-microservices/coupon-contract/src/main/resources/openapi.yaml
++++ b/fixtures/java-microservices/coupon-contract/src/main/resources/openapi.yaml
+@@ -22,3 +22,4 @@ components:
+       properties:
+         redemptionId: {type: string}
+         status: {type: string}
++        redemptionSource: {type: string}

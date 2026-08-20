@@ -1,0 +1,20 @@
+{
+  "id": "dto-field-remove-02-impact",
+  "node_ids": [
+    "api://coupon-core/POST/v1/coupons/redeem#redeemCoupon",
+    "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.onCouponRedeemed",
+    "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.redeemable",
+    "proto://coupon.v1/CouponService/Redeem",
+    "repo://bizguard/src/bizguard/semantic/catalog.yaml#coupon_redemption"
+  ],
+  "evidence": [
+    {
+      "id": "dto-field-remove-02-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "api://coupon-core/POST/v1/coupons/redeem#redeemCoupon",
+      "level": "FACT"
+    }
+  ]
+}

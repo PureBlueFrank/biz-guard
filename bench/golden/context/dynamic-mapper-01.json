@@ -1,0 +1,34 @@
+{
+  "id": "dynamic-mapper-01-context",
+  "base_revision": "semantic-seed-v1",
+  "diff_uri": "repo://bizguard/bench/fixtures/phase1/dynamic-mapper-01.diff",
+  "artifacts": [
+    {
+      "id": "dynamic-mapper-01-artifact",
+      "uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)",
+      "status": "modified",
+      "revision": "semantic-seed-v1",
+      "evidence": [
+        {
+          "id": "dynamic-mapper-01-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)",
+          "level": "FACT"
+        }
+      ]
+    }
+  ],
+  "visible_knowledge_ids": ["field-ledger-status"],
+  "evidence": [
+    {
+      "id": "dynamic-mapper-01-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)",
+      "level": "FACT"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+diff --git a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java
+--- a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java
++++ b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java
+@@ -6,5 +6,5 @@ public final class DynamicCouponMapper {
+-    private static String map(Map<String, Object> values) {
++    private static String map(Map<String, Object> source) {
+         return String.valueOf(values.get("status"));

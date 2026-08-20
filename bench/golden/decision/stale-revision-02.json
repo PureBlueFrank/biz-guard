@@ -1,0 +1,33 @@
+{
+  "outcome": "REQUIRE_APPROVAL",
+  "findings": [
+    {
+      "id": "stale-revision-02-finding",
+      "status": "incomplete",
+      "message": "Knowledge revision is stale relative to the base revision.",
+      "evidence": [
+        {
+          "id": "stale-revision-02-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "stale-semantic-seed-v0",
+          "evidence_uri": "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+          "level": "UNKNOWN"
+        }
+      ],
+      "unknown_reason": "REVISION_MISMATCH"
+    }
+  ],
+  "required_tests": [],
+  "evidence": [
+    {
+      "id": "stale-revision-02-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "stale-semantic-seed-v0",
+      "evidence_uri": "repo://bizguard/knowledge/adr-coupon-idempotency.md",
+      "level": "UNKNOWN"
+    }
+  ],
+  "rationale": "Knowledge revision is stale relative to the base revision."
+}

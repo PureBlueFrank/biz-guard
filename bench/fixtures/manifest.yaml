@@ -1,0 +1,131 @@
+version: 1
+suite: phase1
+tasks:
+  - id: private-rename-01
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/private-rename-01.diff
+    visible_knowledge_ids: [adr-python-style]
+    context_golden: golden/context/private-rename-01.json
+    impact_golden: golden/impact/private-rename-01.json
+    decision_golden: golden/decision/private-rename-01.json
+    expected_tests: []
+    review_sources: [repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem]
+  - id: private-rename-02
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/private-rename-02.diff
+    visible_knowledge_ids: [adr-python-style]
+    context_golden: golden/context/private-rename-02.json
+    impact_golden: golden/impact/private-rename-02.json
+    decision_golden: golden/decision/private-rename-02.json
+    expected_tests: []
+    review_sources: [repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem]
+  - id: idempotency-order-01
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/idempotency-order-01.diff
+    visible_knowledge_ids: [adr-coupon-idempotency]
+    context_golden: golden/context/idempotency-order-01.json
+    impact_golden: golden/impact/idempotency-order-01.json
+    decision_golden: golden/decision/idempotency-order-01.json
+    expected_tests: []
+    review_sources: [repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem]
+  - id: idempotency-order-02
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/idempotency-order-02.diff
+    visible_knowledge_ids: [adr-coupon-idempotency]
+    context_golden: golden/context/idempotency-order-02.json
+    impact_golden: golden/impact/idempotency-order-02.json
+    decision_golden: golden/decision/idempotency-order-02.json
+    expected_tests: []
+    review_sources: [repo://bizguard/sample/coupon-service/redeem_service.py#RedeemService.redeem]
+  - id: dto-field-add-01
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/dto-field-add-01.diff
+    visible_knowledge_ids: [field-ledger-status]
+    context_golden: golden/context/dto-field-add-01.json
+    impact_golden: golden/impact/dto-field-add-01.json
+    decision_golden: golden/decision/dto-field-add-01.json
+    expected_tests: []
+    review_sources: [api://coupon-core/POST/v1/coupons/redeem#redeemCoupon, proto://coupon.v1/CouponService/Redeem]
+  - id: dto-field-remove-02
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/dto-field-remove-02.diff
+    visible_knowledge_ids: [field-ledger-status]
+    context_golden: golden/context/dto-field-remove-02.json
+    impact_golden: golden/impact/dto-field-remove-02.json
+    decision_golden: golden/decision/dto-field-remove-02.json
+    expected_tests: []
+    review_sources: [api://coupon-core/POST/v1/coupons/redeem#redeemCoupon, proto://coupon.v1/CouponService/Redeem]
+  - id: ledger-state-01
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/ledger-state-01.diff
+    visible_knowledge_ids: [field-ledger-status, postmortem-double-redeem]
+    context_golden: golden/context/ledger-state-01.json
+    impact_golden: golden/impact/ledger-state-01.json
+    decision_golden: golden/decision/ledger-state-01.json
+    expected_tests:
+      - id: coupon-core-redeem-idempotency-test
+        repository: coupon-core
+        command: ./mvnw --offline test
+        rationale: Verify ledger state and idempotency.
+        evidence: [{id: ledger-state-01-evidence, source: p0-fixtures-v1, confidence: 1, revision: semantic-seed-v1, evidence_uri: db://coupon-core/coupon_redemption#status}]
+      - id: coupon-contract-redeem-contract-test
+        repository: coupon-contract
+        command: ./mvnw --offline test
+        rationale: Verify redeem API and protocol contract.
+        evidence: [{id: ledger-state-01-contract-evidence, source: p0-fixtures-v1, confidence: 1, revision: semantic-seed-v1, evidence_uri: api://coupon-core/POST/v1/coupons/redeem#redeemCoupon}]
+    review_sources: [db://coupon-core/coupon_redemption#status, mq://coupon-core/coupon.redeemed#status]
+  - id: ledger-state-02
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/ledger-state-02.diff
+    visible_knowledge_ids: [field-ledger-status, postmortem-double-redeem]
+    context_golden: golden/context/ledger-state-02.json
+    impact_golden: golden/impact/ledger-state-02.json
+    decision_golden: golden/decision/ledger-state-02.json
+    expected_tests:
+      - id: coupon-core-redeem-idempotency-test
+        repository: coupon-core
+        command: ./mvnw --offline test
+        rationale: Verify ledger state and idempotency.
+        evidence: [{id: ledger-state-02-evidence, source: p0-fixtures-v1, confidence: 1, revision: semantic-seed-v1, evidence_uri: db://coupon-core/coupon_redemption#status}]
+      - id: coupon-contract-redeem-contract-test
+        repository: coupon-contract
+        command: ./mvnw --offline test
+        rationale: Verify redeem API and protocol contract.
+        evidence: [{id: ledger-state-02-contract-evidence, source: p0-fixtures-v1, confidence: 1, revision: semantic-seed-v1, evidence_uri: api://coupon-core/POST/v1/coupons/redeem#redeemCoupon}]
+    review_sources: [db://coupon-core/coupon_redemption#status, mq://coupon-core/coupon.redeemed#status]
+  - id: dynamic-mapper-01
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/dynamic-mapper-01.diff
+    visible_knowledge_ids: [field-ledger-status]
+    context_golden: golden/context/dynamic-mapper-01.json
+    impact_golden: golden/impact/dynamic-mapper-01.json
+    decision_golden: golden/decision/dynamic-mapper-01.json
+    expected_tests: []
+    review_sources: [repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)]
+  - id: dynamic-mapper-02
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/dynamic-mapper-02.diff
+    visible_knowledge_ids: [field-ledger-status]
+    context_golden: golden/context/dynamic-mapper-02.json
+    impact_golden: golden/impact/dynamic-mapper-02.json
+    decision_golden: golden/decision/dynamic-mapper-02.json
+    expected_tests: []
+    review_sources: [repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)]
+  - id: stale-revision-01
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/stale-revision-01.diff
+    visible_knowledge_ids: [adr-coupon-idempotency]
+    context_golden: golden/context/stale-revision-01.json
+    impact_golden: golden/impact/stale-revision-01.json
+    decision_golden: golden/decision/stale-revision-01.json
+    expected_tests: []
+    review_sources: [repo://bizguard/knowledge/adr-coupon-idempotency.md]
+  - id: stale-revision-02
+    base_revision: semantic-seed-v1
+    input_diff: bench/fixtures/phase1/stale-revision-02.diff
+    visible_knowledge_ids: [adr-coupon-idempotency]
+    context_golden: golden/context/stale-revision-02.json
+    impact_golden: golden/impact/stale-revision-02.json
+    decision_golden: golden/decision/stale-revision-02.json
+    expected_tests: []
+    review_sources: [repo://bizguard/knowledge/adr-coupon-idempotency.md]

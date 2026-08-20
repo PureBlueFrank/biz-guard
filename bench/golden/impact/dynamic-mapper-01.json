@@ -1,0 +1,18 @@
+{
+  "id": "dynamic-mapper-01-impact",
+  "node_ids": [
+    "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)",
+    "db://coupon-core/coupon_redemption#status"
+  ],
+  "evidence": [
+    {
+      "id": "dynamic-mapper-01-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)",
+      "level": "FACT"
+    }
+  ],
+  "unknown_reason": "DYNAMIC_BOUNDARY"
+}

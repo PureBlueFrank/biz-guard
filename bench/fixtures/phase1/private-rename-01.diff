@@ -1,0 +1,9 @@
+diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py
+--- a/sample/coupon-service/redeem_service.py
++++ b/sample/coupon-service/redeem_service.py
+@@ -39,5 +39,5 @@ class RedeemService:
+-        client_coupon_id = coupon_id
++        ledger_coupon_id = coupon_id
+         IdempotencyStore.check(idempotency_key)
+-        self.ledger.redeem(client_coupon_id)
++        self.ledger.redeem(ledger_coupon_id)

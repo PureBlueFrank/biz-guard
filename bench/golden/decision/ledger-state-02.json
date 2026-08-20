@@ -1,0 +1,66 @@
+{
+  "outcome": "BLOCK",
+  "findings": [
+    {
+      "id": "ledger-state-02-finding",
+      "status": "violated",
+      "message": "Frozen P0 source evidence supports this conclusion.",
+      "evidence": [
+        {
+          "id": "ledger-state-02-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "db://coupon-core/coupon_redemption#status",
+          "level": "FACT"
+        }
+      ],
+      "policy_mode": "blocking"
+    }
+  ],
+  "required_tests": [
+    {
+      "id": "coupon-core-redeem-idempotency-test",
+      "repository": "coupon-core",
+      "command": "./mvnw --offline test",
+      "rationale": "Verify ledger state and idempotency.",
+      "evidence": [
+        {
+          "id": "ledger-state-02-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "db://coupon-core/coupon_redemption#status",
+          "level": "FACT"
+        }
+      ]
+    },
+    {
+      "id": "coupon-contract-redeem-contract-test",
+      "repository": "coupon-contract",
+      "command": "./mvnw --offline test",
+      "rationale": "Verify redeem API and protocol contract.",
+      "evidence": [
+        {
+          "id": "ledger-state-02-contract-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "api://coupon-core/POST/v1/coupons/redeem#redeemCoupon",
+          "level": "FACT"
+        }
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ledger-state-02-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "db://coupon-core/coupon_redemption#status",
+      "level": "FACT"
+    }
+  ],
+  "rationale": "Frozen P0 source evidence supports this conclusion."
+}

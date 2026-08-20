@@ -1,0 +1,33 @@
+{
+  "outcome": "REQUIRE_APPROVAL",
+  "findings": [
+    {
+      "id": "dto-field-remove-02-finding",
+      "status": "incomplete",
+      "message": "Removing a published response field requires downstream consumer review.",
+      "unknown_reason": "UNKNOWN",
+      "evidence": [
+        {
+          "id": "dto-field-remove-02-evidence",
+          "source": "p0-fixtures-v1",
+          "confidence": 1,
+          "revision": "semantic-seed-v1",
+          "evidence_uri": "api://coupon-core/POST/v1/coupons/redeem#redeemCoupon",
+          "level": "FACT"
+        }
+      ]
+    }
+  ],
+  "required_tests": [],
+  "evidence": [
+    {
+      "id": "dto-field-remove-02-evidence",
+      "source": "p0-fixtures-v1",
+      "confidence": 1,
+      "revision": "semantic-seed-v1",
+      "evidence_uri": "api://coupon-core/POST/v1/coupons/redeem#redeemCoupon",
+      "level": "FACT"
+    }
+  ],
+  "rationale": "The published DTO removal may break consumers outside the frozen fixture graph."
+}
