@@ -1,14 +1,20 @@
+"""Contract evidence collected from a caller-selected repository snapshot."""
+
+from pathlib import Path
+
 from bizguard.domain.models import Evidence
+from bizguard.graph.indexer import index
 
 
 class ContractProvider:
+    def __init__(self, repos: Path, revision: str) -> None:
+        self.repos = repos
+        self.revision = revision
+
     def collect(self) -> list[Evidence]:
         return [
-            Evidence(
-                id="fixture:contract",
-                source="IDL",
-                confidence=0.9,
-                revision="phase3-fixture-v1",
-                evidence_uri="repo://coupon-contract/src/main/resources/openapi.yaml#L25:C9",
-            )
+            Evidence(id=f"edge:{edge.id}", source=edge.source, confidence=edge.confidence,
+                     revision=edge.revision, evidence_uri=edge.evidence_uri)
+            for edge in index(self.repos, self.revision).edges
+            if edge.source == "IDL"
         ]

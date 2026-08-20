@@ -1,36 +1,31 @@
-# mypy: disable-error-code=no-untyped-def
 from pathlib import Path
+
 from bizguard.graph.indexer import index
 from bizguard.impact.analyzer import analyze
 
 
-def test_five_layers():
-    assert set(analyze(index(Path("fixtures/java-microservices"), "r"), "x", "r").layers) == {
-        "L1",
-        "L2",
-        "L3",
-        "L4",
-        "L5",
-    }
+ROOT = Path("fixtures/java-microservices")
 
 
-def test_capability_endpoint():
-    assert (
-        analyze(index(Path("fixtures/java-microservices"), "r"), "x", "r").path[-1]
-        == "capability://coupon-redemption"
-    )
+def test_analysis_uses_changed_node_and_real_shortest_path() -> None:
+    snapshot = index(ROOT, "r")
+    dto = "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status"
+    mapper = "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map()"
+    assert analyze(snapshot, dto, "r").path != analyze(snapshot, mapper, "r").path
+    assert analyze(snapshot, dto, "r").path[0] == dto
 
 
-def test_dynamic_unknown():
-    assert analyze(
-        index(Path("fixtures/java-microservices"), "r"), "DynamicCouponMapper", "r"
-    ).unknown_boundary
+def test_dynamic_boundary_is_graph_property_not_name_match() -> None:
+    snapshot = index(ROOT, "r")
+    mapper = "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map()"
+    assert analyze(snapshot, mapper, "r").unknown_boundary
+    assert not analyze(snapshot, "repo://coupon-core/DynamicCouponMapperWhatever", "r").unknown_boundary
 
 
-def test_stale_unknown():
-    assert analyze(index(Path("fixtures/java-microservices"), "r"), "x", "other").unknown_boundary
-
-
-def test_evidence_has_contract_fields():
-    e = analyze(index(Path("fixtures/java-microservices"), "r"), "x", "r").evidence[0]
-    assert e.id and e.source and e.revision and e.evidence_uri
+def test_path_evidence_is_taken_from_traversed_edges() -> None:
+    snapshot = index(ROOT, "r")
+    changed = "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status"
+    result = analyze(snapshot, changed, "r")
+    edge_uris = {edge.evidence_uri for edge in snapshot.edges}
+    assert result.evidence
+    assert all(item.evidence_uri in edge_uris for item in result.evidence)

@@ -57,18 +57,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _impact(arguments: argparse.Namespace) -> int:
     """Build a pinned fixture snapshot and report conservative impact JSON."""
     import yaml  # type: ignore[import-untyped]
+    from bizguard.eval.impact import changed_id_from_diff_text
     from bizguard.graph.indexer import index
     from bizguard.impact.analyzer import analyze
 
     raw = yaml.safe_load(arguments.revision_set.read_text(encoding="utf-8")) or {}
     revision = str(raw.get("revision", "phase3-fixture-v1"))
     diff_text = arguments.diff.read_text(encoding="utf-8")
-    changed = (
-        "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status"
-        if "status" in diff_text
-        else "UNKNOWN_BOUNDARY"
-    )
-    result = analyze(index(arguments.repos, revision), changed, revision)
+    snapshot = index(arguments.repos, revision)
+    changed = changed_id_from_diff_text(snapshot, diff_text)
+    result = analyze(snapshot, changed, revision)
     print(
         json.dumps(
             {

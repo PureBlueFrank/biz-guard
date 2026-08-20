@@ -21,6 +21,7 @@ class ContractFact:
 def analyze_openapi(path: Path, service: str, revision: str) -> list[ContractFact]:
     root = yaml.compose(path.read_text(encoding="utf-8"))
     facts: list[ContractFact] = []
+    relative = str(path).split(f"{service}/", 1)[-1]
     if root is None:
         return facts
 
@@ -41,7 +42,7 @@ def analyze_openapi(path: Path, service: str, revision: str) -> list[ContractFac
                             api_id(service, value_key, keys[-1]),
                             key.start_mark.line + 1,
                             key.start_mark.column + 1,
-                            f"repo://{service}/{path.name}#L{key.start_mark.line + 1}:C{key.start_mark.column + 1}",
+                            f"repo://{service}/{relative}#L{key.start_mark.line + 1}:C{key.start_mark.column + 1}",
                         )
                     )
                 if keys and keys[-1] == "properties":
@@ -52,7 +53,7 @@ def analyze_openapi(path: Path, service: str, revision: str) -> list[ContractFac
                             api_id(service, "SCHEMA", value_key),
                             key.start_mark.line + 1,
                             key.start_mark.column + 1,
-                            f"repo://{service}/{path.name}#L{key.start_mark.line + 1}:C{key.start_mark.column + 1}",
+                            f"repo://{service}/{relative}#L{key.start_mark.line + 1}:C{key.start_mark.column + 1}",
                         )
                     )
                 walk(value, nxt)
@@ -64,10 +65,11 @@ def analyze_openapi(path: Path, service: str, revision: str) -> list[ContractFac
     return facts
 
 
-def analyze_proto(path: Path, revision: str) -> list[ContractFact]:
+def analyze_proto(path: Path, revision: str, repository: str = "coupon-contract") -> list[ContractFact]:
     facts: list[ContractFact] = []
     package = "default"
     message = ""
+    relative = str(path).split(f"{repository}/", 1)[-1]
     for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if match := re.match(r"\s*package\s+([\w.]+)", line):
             package = match.group(1)
@@ -83,7 +85,7 @@ def analyze_proto(path: Path, revision: str) -> list[ContractFact]:
                     proto_id(package, message, name),
                     line_no,
                     col,
-                    f"repo://coupon-contract/{path.name}#L{line_no}:C{col}",
+                    f"repo://{repository}/{relative}#L{line_no}:C{col}",
                 )
             )
     return facts

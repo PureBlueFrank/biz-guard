@@ -1,0 +1,25 @@
+# Explicit fixture annotations for relationships static Java syntax cannot prove.
+edges:
+  - kind: MAPS_TO
+    source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status
+    target_id: api://coupon-contract/SCHEMA/status
+    source: manual
+    evidence_uri: repo://coupon-contract/src/main/resources/openapi.yaml#L31:C9
+  - kind: MAPS_TO
+    source_id: api://coupon-contract/SCHEMA/status
+    target_id: repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto.status
+    source: manual
+    evidence_uri: repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#L4:C65
+  - kind: PUBLISHES
+    source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer.publish()
+    target_id: mq://coupon-core/coupon.redeemed#status
+    source: manual
+    evidence_uri: repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#L6:C17
+  - kind: CONSUMES
+    source_id: mq://coupon-core/coupon.redeemed#status
+    target_id: repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.onCouponRedeemed()
+    source: manual
+    evidence_uri: repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#L5:C17
+boundary_nodes:
+  - id: repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map()
+    evidence_uri: repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L9:C5
