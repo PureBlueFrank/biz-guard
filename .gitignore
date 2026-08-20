@@ -12,3 +12,6 @@ dist/
 embedding_cache/
 *.embedding-cache
 fixtures/java-microservices/*/target/
+
+.artifacts/
+*.sqlite3

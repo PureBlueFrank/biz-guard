@@ -44,7 +44,7 @@ def test_unindexed_route_is_explicitly_unknown() -> None:
 def test_isolated_synthetic_call_is_explicitly_unknown() -> None:
     call = "repo://coupon-core/Example.java#call%3Aunresolved%401"
     snapshot = GraphSnapshot(
-        "r", {}, [GraphNode(call, NodeKind.CODE, "unresolved", "r")], []
+        "r", {}, "", [GraphNode(call, NodeKind.CODE, "unresolved", "r")], []
     )
     result = analyze(snapshot, call, "r")
     assert result.path == [call, "UNKNOWN_BOUNDARY"]
@@ -67,6 +67,7 @@ def test_dynamic_dead_end_has_the_same_unknown_fallback_in_evaluator() -> None:
     snapshot = GraphSnapshot(
         "r",
         {},
+        "",
         [
             GraphNode(dynamic, NodeKind.CODE, "map", "r", {"dynamic": "true"}),
             GraphNode(dead_end, NodeKind.INTERFACE, "dead-end", "r"),
