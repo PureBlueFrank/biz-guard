@@ -21,5 +21,5 @@ def test_demo_script_replays_all_deterministic_outcomes() -> None:
     assert "原生 Coding Agent（模拟，确定性）：代码可编译、改动看似合理，放行。" in result.stdout
     assert result.stdout.count('"decision":"BLOCK"') == 1
     assert result.stdout.count('"decision":"ALLOW"') == 1
-    assert result.stdout.count('"decision":"CHECK_INCOMPLETE"') == 1
-    assert '"code":"policy_uncovered"' in result.stdout
+    assert result.stdout.count('"decision":"REQUIRE_APPROVAL"') == 1
+    assert '"evidence":["fault:policy_uncovered"]' in result.stdout

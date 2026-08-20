@@ -1,7 +1,7 @@
 cases:
-  - {id: approved, outcome: approved}
-  - {id: rejected, outcome: rejected}
-  - {id: evidence, outcome: pending}
-  - {id: cosign, outcome: approved}
-  - {id: expired-waiver, outcome: pending}
-  - {id: unavailable, outcome: pending}
+  - {id: approved, outcome: approved, approvers: [a], cosigns: 1, actions: [[approve, a]]}
+  - {id: rejected, outcome: rejected, approvers: [a], cosigns: 1, actions: [[reject, a]]}
+  - {id: evidence, outcome: pending, approvers: [a], cosigns: 1, actions: [[request_evidence, need-test], [add_evidence, test://run]]}
+  - {id: cosign, outcome: approved, approvers: [a, b], cosigns: 2, actions: [[approve, a], [approve, b]]}
+  - {id: expired-waiver, outcome: pending, approvers: [a], cosigns: 1, waiver_expired: true, actions: []}
+  - {id: unavailable, outcome: pending, approvers: [a], cosigns: 1, available: false, actions: []}

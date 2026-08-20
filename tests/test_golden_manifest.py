@@ -69,3 +69,12 @@ def test_verifier_rejects_self_loop_and_outcome_contradiction(tmp_path: Path) ->
     decision_payload["outcome"] = "ALLOW"
     decision.write_text(json.dumps(decision_payload), encoding="utf-8")
     assert verify(manifest, "phase1") == 1
+
+
+def test_phase5_verifier_consumes_and_rejects_mutated_golden(tmp_path: Path) -> None:
+    manifest = _copy_phase1_suite(tmp_path)
+    decisions = tmp_path / "bench" / "fixtures" / "phase5" / "decision-tasks.yaml"
+    payload = yaml.safe_load(decisions.read_text(encoding="utf-8"))
+    payload["tasks"][0]["expected"] = "ALLOW"
+    decisions.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    assert verify(manifest, "phase5") == 1

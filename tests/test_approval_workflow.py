@@ -48,3 +48,10 @@ def test_delegate_can_approve() -> None:
 def test_bad_waiver_is_rejected() -> None:
     with pytest.raises(ValueError):
         ApprovalService().grant_waiver(ApprovalRequest(change_context_id="c", policy_revision="r", approvers=("a",), required_cosigns=1), Waiver(scope="", reason="", compensating_control="", expires_at=datetime.now(timezone.utc)))
+
+
+def test_add_evidence_is_a_documented_pending_self_transition() -> None:
+    service = ApprovalService()
+    request = service.create(ApprovalRequest(change_context_id="c", policy_revision="r", approvers=("a",), required_cosigns=1))
+    service.add_evidence(request, "test://run")
+    assert request.state is ApprovalState.PENDING

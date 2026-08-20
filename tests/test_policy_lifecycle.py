@@ -16,7 +16,7 @@ from bizguard.policy.validators import validate_artifact
         ("coupon-write-consumes-idempotency-key", "schema_version: 1", "x.avsc", False),
         ("coupon-write-consumes-idempotency-key", "type: record", "x.avsc", True),
         ("coupon-write-consumes-idempotency-key", "version: 1", "x.avsc", False),
-    ] * 3,
+    ],
 )
 def test_frozen_policy_artifacts_are_content_validated(policy: str, source: str, path: str, violated: bool) -> None:
     assert validate_artifact(policy, source, path)["violated"] is violated
@@ -35,3 +35,8 @@ def test_lifecycle_promotes_and_rolls_back_from_fixture_gate() -> None:
 def test_lifecycle_rejects_unmeasured_promotion() -> None:
     with pytest.raises(ValueError):
         PolicyLifecycle(policy_id="p").promote(PromotionGates(min_samples=1, max_false_positive_rate=0.0))
+
+
+def test_proto_required_fields_are_checked_against_full_file_content() -> None:
+    full_content = "syntax = 'proto3';\nmessage Coupon {\n  string name = 1;\n}\n"
+    assert validate_artifact("published-dto-backward-compatible", full_content, "coupon.proto")["violated"] is True

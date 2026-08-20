@@ -1,6 +1,6 @@
 {
-  "agent": "offline-baseline-agent",
-  "model": "recorded-local-agent-v1",
+  "agent": "offline-naive-baseline",
+  "model": "recorded-heuristic-v1",
   "prompt": "check redemption idempotency",
   "bizguard_version": "0.1.0",
   "revision": "phase5-v2",
@@ -11,7 +11,9 @@
   "tool_calls": [
     {
       "tool": "bizguard.validate_patch",
-      "input": {"fixture": "sample/diffs/diff_violation_1.diff"},
+      "input": {
+        "diff_text": "diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py\n--- a/sample/coupon-service/redeem_service.py\n+++ b/sample/coupon-service/redeem_service.py\n@@ -38,5 +38,4 @@ class RedeemService:\n \n     @transaction\n     def redeem(self, coupon_id: str, idempotency_key: str) -> None:\n-        IdempotencyStore.check(idempotency_key)\n         self.ledger.redeem(coupon_id)\n"
+      },
       "output": {"decision": "BLOCK", "finding_status": "violated"},
       "duration_ms": 3.4
     }

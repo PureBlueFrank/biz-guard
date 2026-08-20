@@ -1,6 +1,9 @@
 """Risk scoring used only after four-state hard gates."""
 
-from bizguard.decision.v2 import FindingV2
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bizguard.decision.v2 import FindingV2
 
 
 _WEIGHTS = {"low": 0.15, "medium": 0.35, "high": 0.65, "critical": 1.0}

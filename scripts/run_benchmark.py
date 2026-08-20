@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
+import asyncio
 from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import shlex
 import subprocess
 import time
@@ -23,7 +28,7 @@ from bizguard.knowledge.repository import KnowledgeRepository
 from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
 
 
-BASELINES = ("Agent Only", "Rules Only", "RAG Only", "Context", "Full")
+BASELINES = ("Naive Baseline", "Rules Only", "RAG Only", "Context", "Full")
 ROOT = Path(__file__).resolve().parents[1]
 TRANSCRIPT = ROOT / "bench" / "ablations" / "agent_transcript.json"
 _OUTCOMES = {
@@ -102,8 +107,8 @@ def _context(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return "allow", pack_data
 
 
-def _agent(diff_text: str) -> str:
-    """Independent offline baseline agent: a deliberately naive diff-content reader."""
+def _naive_baseline(diff_text: str) -> str:
+    """Offline heuristic baseline, not an LLM agent or an MCP client."""
     removed = "\n".join(
         line[1:] for line in diff_text.splitlines() if line.startswith("-") and not line.startswith("---")
     ).lower()
@@ -122,29 +127,28 @@ def _agent(diff_text: str) -> str:
 def _full(task: dict[str, Any], diff_text: str) -> str:
     """Run policy validators then feed their real result into Decision v2."""
     policy = evaluate_change(diff_text)
-    context_prediction, pack = _context(task)
+    _, pack = _context(task)
     violated = policy.decision is Decision.BLOCK
     unknown = policy.decision is Decision.CHECK_INCOMPLETE
     finding = FindingV2(
         id="policy-pipeline",
-        severity="critical",
+        severity="critical" if violated else "medium",
         effect="AST policy evaluation",
         remediation="resolve policy findings",
         confidence=1.0,
         violated=violated,
         critical_unknown=unknown,
+        public_contract=bool(task.get("public_contract", False)),
     )
     result = decide(
         DecisionInput(
             findings=[finding],
-            tests_passed=False,
+            tests_passed=bool(task["tests_passed"]),
             required_tests=cast(list[str], [str(item["id"]) for item in pack["required_tests"]]),
-            owners=cast(list[str], pack["required_approvers"]),
+            owners=cast(list[str], pack["required_approvers"]) + cast(list[str], task.get("owners", [])),
             version_known=not unknown,
-            risk_score=0.2,
         )
     )
-    del context_prediction
     return _OUTCOMES[result.decision]
 
 
@@ -157,8 +161,8 @@ def _predict(task: dict[str, Any], baseline: str, dataset: Path) -> str:
         return _rag(diff_text)
     if baseline == "Context":
         return _context(task)[0]
-    if baseline == "Agent Only":
-        return _agent(diff_text)
+    if baseline == "Naive Baseline":
+        return _naive_baseline(diff_text)
     if baseline == "Full":
         return _full(task, diff_text)
     raise ValueError(f"unknown baseline: {baseline}")
@@ -199,7 +203,24 @@ def _offline_transcript(tasks: list[dict[str, Any]], dataset: Path, revision: ob
     calls = transcript["tool_calls"]
     if not isinstance(calls, list) or not calls or any(not isinstance(call, dict) for call in calls):
         raise ValueError("recorded agent transcript has no MCP calls")
+    _validate_tool_calls(calls)
     return transcript
+
+
+def _validate_tool_calls(calls: list[dict[str, Any]]) -> None:
+    """Replay transcript calls through FastMCP so recorded inputs remain schema-valid."""
+    from agents_mcp.server import mcp
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    for call in calls:
+        tool = call.get("tool")
+        arguments = call.get("input")
+        if tool != "bizguard.validate_patch" or not isinstance(arguments, dict):
+            raise ValueError("recorded agent transcript has an unsupported tool call")
+        try:
+            asyncio.run(mcp.call_tool("validate_patch", arguments))
+        except (ToolError, ValueError) as exc:
+            raise ValueError("recorded agent transcript tool input fails MCP schema validation") from exc
 
 
 def _live_transcript(tasks: list[dict[str, Any]], dataset: Path, revision: object) -> dict[str, Any]:
@@ -231,7 +252,12 @@ def run(dataset: Path, offline: bool) -> dict[str, Any]:
         _read_diff(task, dataset)
     revision = raw.get("version")
     trajectory = _offline_transcript(tasks, dataset, revision) if offline else _live_transcript(tasks, dataset, revision)
-    return {"dataset_revision": revision, "baselines": [_measure(tasks, baseline, dataset) for baseline in BASELINES], "agent_trajectory": trajectory}
+    return {
+        "dataset_revision": revision,
+        "offline_notice": "Naive Baseline is a heuristic, not a real agent.",
+        "baselines": [_measure(tasks, baseline, dataset) for baseline in BASELINES],
+        "agent_trajectory": trajectory,
+    }
 
 
 def main() -> int:

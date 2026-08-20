@@ -36,6 +36,12 @@ def test_offline_trajectory_is_loaded_from_recorded_mcp_transcript() -> None:
     assert output["agent_trajectory"] == transcript
     assert transcript["tool_calls"][0]["tool"] == "bizguard.validate_patch"
     assert all(transcript.get(field) for field in ("agent", "model", "prompt", "bizguard_version", "revision", "task_id", "decision", "duration_ms"))
+    assert "diff_text" in transcript["tool_calls"][0]["input"]
+
+
+def test_full_matches_all_twelve_golden_task_outcomes() -> None:
+    payload = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
+    assert [_predict(task, "Full", DATASET) for task in payload["tasks"]] == [task["truth"] for task in payload["tasks"]]
 
 
 def test_prediction_changes_when_its_real_diff_content_changes(tmp_path: Path) -> None:

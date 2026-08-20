@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -46,6 +47,8 @@ def verify(manifest_path: Path, suite: str) -> int:
             return _verify_phase2(manifest_path)
         if suite == "phase4":
             return _verify_phase4(manifest_path)
+        if suite == "phase5":
+            return _verify_phase5(manifest_path)
         manifest_path = manifest_path.resolve()
         manifest = Manifest.model_validate(
             yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
@@ -205,6 +208,91 @@ def _verify_phase2(manifest_path: Path) -> int:
         if ids != [task["required_test"]] or task["bait_test"] in ids:
             raise ValueError(f"semantic required-test mismatch: {task['id']}")
     print("6/6 phase2 semantic tasks verified")
+    return 0
+
+
+def _verify_phase5(manifest_path: Path) -> int:
+    """Execute Phase 5 decision, approval, and lifecycle golden fixtures."""
+    root = manifest_path.resolve().parent.parent.parent
+    fixture_root = root / "bench" / "fixtures" / "phase5"
+    decisions = yaml.safe_load((fixture_root / "decision-tasks.yaml").read_text(encoding="utf-8")) or {}
+    approvals = yaml.safe_load((fixture_root / "approvals.yaml").read_text(encoding="utf-8")) or {}
+    lifecycle = yaml.safe_load((fixture_root / "lifecycle.yaml").read_text(encoding="utf-8")) or {}
+    decision_tasks = decisions.get("tasks") if isinstance(decisions, dict) else None
+    approval_cases = approvals.get("cases") if isinstance(approvals, dict) else None
+    transitions = lifecycle.get("transitions") if isinstance(lifecycle, dict) else None
+    gates_data = lifecycle.get("promotion_gates") if isinstance(lifecycle, dict) else None
+    if not isinstance(decision_tasks, list) or len(decision_tasks) != 12:
+        raise ValueError("phase5 requires exactly 12 decision tasks")
+    if not isinstance(approval_cases, list) or len(approval_cases) != 6:
+        raise ValueError("phase5 requires exactly 6 approval cases")
+    if not isinstance(transitions, list) or not isinstance(gates_data, dict):
+        raise ValueError("phase5 lifecycle fixture is invalid")
+
+    from bizguard.decision.v2 import DecisionInput, FindingV2, decide
+    from bizguard.policy.lifecycle import PolicyLifecycle, PromotionGates
+    from bizguard.workflow.approval import ApprovalRequest, ApprovalService, Waiver
+
+    for task in decision_tasks:
+        if not isinstance(task, dict):
+            raise ValueError("phase5 decision task must be a mapping")
+        findings = []
+        if task.get("critical_violation") or task.get("public_contract"):
+            findings.append(FindingV2(
+                id=str(task["id"]), severity="critical", effect="fixture", remediation="fixture", confidence=1.0,
+                violated=bool(task.get("critical_violation", False)), public_contract=bool(task.get("public_contract", False)),
+            ))
+        actual = decide(DecisionInput(
+            findings=findings, tests_passed=bool(task["tests"]),
+            required_tests=[str(item) for item in task.get("required_tests", [])],
+            owners=[str(item) for item in task.get("approvers", [])],
+            version_known=bool(task.get("version_known", True)),
+        )).decision
+        if actual.value != task.get("expected"):
+            raise ValueError(f"phase5 decision golden mismatch: {task.get('id')}")
+
+    for case in approval_cases:
+        if not isinstance(case, dict):
+            raise ValueError("phase5 approval case must be a mapping")
+        service = ApprovalService(available=bool(case.get("available", True)))
+        request = service.create(ApprovalRequest(
+            change_context_id=str(case["id"]), policy_revision="phase5", approvers=tuple(case["approvers"]),
+            required_cosigns=int(case["cosigns"]),
+        ))
+        if case.get("waiver_expired"):
+            service.grant_waiver(request, Waiver(
+                scope="fixture", reason="fixture", compensating_control="fixture",
+                expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+            ))
+            if request.waiver is None or request.waiver.active():
+                raise ValueError(f"phase5 expired waiver remains active: {case['id']}")
+        for action in case.get("actions", []):
+            if not isinstance(action, list) or len(action) != 2:
+                raise ValueError(f"phase5 approval action is invalid: {case['id']}")
+            if action[0] == "approve":
+                service.approve(request, str(action[1]))
+            elif action[0] == "reject":
+                service.reject(request, str(action[1]), "fixture")
+            elif action[0] == "request_evidence":
+                service.request_evidence(request, str(action[1]))
+            elif action[0] == "add_evidence":
+                service.add_evidence(request, str(action[1]))
+            else:
+                raise ValueError(f"phase5 approval action is unsupported: {case['id']}")
+        if request.state.value != case.get("outcome"):
+            raise ValueError(f"phase5 approval golden mismatch: {case['id']}")
+
+    gates = PromotionGates.model_validate(gates_data)
+    policy = PolicyLifecycle(policy_id="phase5-fixture", samples=gates.min_samples)
+    actual_transitions = [policy.mode.value]
+    for _ in range(3):
+        policy.promote(gates)
+        actual_transitions.append(policy.mode.value)
+    policy.rollback()
+    actual_transitions.append(policy.mode.value)
+    if actual_transitions != transitions:
+        raise ValueError("phase5 lifecycle golden mismatch")
+    print("12/12 phase5 decisions + 6/6 approvals + lifecycle verified")
     return 0
 
 

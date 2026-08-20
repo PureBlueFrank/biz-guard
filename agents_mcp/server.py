@@ -9,6 +9,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 
 from bizguard.context.compiler import ContextCompiler
 from bizguard.decision import ChangeSafetyCard, evaluate_change
+from bizguard.decision.v2 import DecisionResult, decide_diff
 from bizguard.impact.service import ImpactService
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
@@ -87,9 +88,9 @@ def request_approval(change_context_id: str, requested_by: str, reason: str) -> 
     raise ToolError("request_approval is schema-only until Phase 5; no approval was created")
 
 
-@mcp.tool(description="当前聚合共享确定性校验结果的只读变更决定；P5 将加入审批聚合。")
-def get_change_decision(diff_text: str) -> ChangeSafetyCard:
-    return evaluate_change(diff_text)
+@mcp.tool(description="聚合确定性校验为四态决定、证据链、必需测试和审批人；只读且没有副作用。")
+def get_change_decision(diff_text: str) -> DecisionResult:
+    return decide_diff(diff_text)
 
 
 if __name__ == "__main__":

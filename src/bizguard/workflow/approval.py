@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
-from .audit import AuditTrail
+from bizguard.observability import AuditTrail
 from .state_machine import ApprovalState, transition
 
 

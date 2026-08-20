@@ -1,5 +1,7 @@
 # BizGuard
 
+离线 benchmark 中的 “Naive Baseline” 是基于 diff 内容的启发式基线，并非真实 LLM agent；只有 `--live` 且配置真实 agent 命令时才会运行真实 agent。
+
 BizGuard 是用于确定性业务变更安全检查的项目骨架。
 
 ## Diff 执行前提

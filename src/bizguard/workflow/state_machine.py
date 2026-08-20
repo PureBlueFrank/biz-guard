@@ -13,7 +13,7 @@ class ApprovalState(StrEnum):
 
 
 _TRANSITIONS = {
-    ApprovalState.PENDING: {ApprovalState.EVIDENCE_REQUESTED, ApprovalState.APPROVED, ApprovalState.REJECTED, ApprovalState.EXPIRED, ApprovalState.ESCALATED},
+    ApprovalState.PENDING: {ApprovalState.PENDING, ApprovalState.EVIDENCE_REQUESTED, ApprovalState.APPROVED, ApprovalState.REJECTED, ApprovalState.EXPIRED, ApprovalState.ESCALATED},
     ApprovalState.EVIDENCE_REQUESTED: {ApprovalState.PENDING, ApprovalState.REJECTED, ApprovalState.EXPIRED, ApprovalState.ESCALATED},
     ApprovalState.ESCALATED: {ApprovalState.APPROVED, ApprovalState.REJECTED, ApprovalState.EXPIRED},
 }

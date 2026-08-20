@@ -12,6 +12,7 @@ import pytest
 
 from agents_mcp.server import mcp
 from bizguard.decision import evaluate_change
+from bizguard.decision.v2 import decide_diff
 
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -56,8 +57,8 @@ def test_mcp_tool_matches_shared_decision() -> None:
     assert _structured_card(result) == evaluate_change(diff_text).model_dump(mode="json")
 
 
-def test_cli_and_mcp_return_the_same_card() -> None:
-    """CLI and MCP retain identical decision, findings, and evidence for one input."""
+def test_cli_and_mcp_return_the_same_v2_decision() -> None:
+    """CLI and v2 MCP decision expose the same four-state evidence contract."""
     diff_path = PROJECT_ROOT / "sample/diffs/diff_violation_1.diff"
     environment = os.environ | {"PYTHONPATH": str(PROJECT_ROOT / "src")}
     cli = subprocess.run(
@@ -69,12 +70,17 @@ def test_cli_and_mcp_return_the_same_card() -> None:
         check=False,
     )
 
-    mcp_result = _call_tool("prepare_change", {"diff_text": diff_path.read_text(encoding="utf-8")})
+    mcp_result = _call_tool("get_change_decision", {"diff_text": diff_path.read_text(encoding="utf-8")})
 
     assert cli.returncode == 1
-    response = _structured_card(mcp_result)
+    assert json.loads(cli.stdout) == _structured_card(mcp_result) == decide_diff(diff_path.read_text()).model_dump(mode="json")
+
+
+def test_legacy_diff_adapters_remain_compatible() -> None:
+    diff_text = (PROJECT_ROOT / "sample/diffs/diff_violation_1.diff").read_text(encoding="utf-8")
+    response = _structured_card(_call_tool("prepare_change", {"diff_text": diff_text}))
     assert response["legacy"] is True
-    assert json.loads(cli.stdout) == response["result"]
+    assert response["result"] == evaluate_change(diff_text).model_dump(mode="json")
 
 
 def test_mcp_rejects_non_string_diff_text() -> None:

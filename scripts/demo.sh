@@ -20,15 +20,15 @@ run_check() {
 }
 
 expect_exit() {
-    expected=$1
+    wanted_exit=$1
     diff_path=$2
     if output=$(run_check "$diff_path"); then
         actual=0
     else
         actual=$?
     fi
-    if [ "$actual" -ne "$expected" ]; then
-        printf '%s\n' "演示失败：期望退出码 $expected，实际为 $actual" >&2
+    if [ "$actual" -ne "$wanted_exit" ]; then
+        printf '%s\n' "演示失败：期望退出码 $wanted_exit，实际为 $actual" >&2
         return 1
     fi
     printf '%s\n' "$output"
@@ -44,5 +44,5 @@ expect_exit 1 "$PROJECT_ROOT/sample/diffs/diff_violation_1.diff"
 printf '\n%s\n' '步骤 2：正常 diff（预期 ALLOW，退出码 0）'
 expect_exit 0 "$PROJECT_ROOT/sample/diffs/diff_normal_1.diff"
 
-printf '\n%s\n' '步骤 3：未覆盖 Policy 的 diff（预期 CHECK_INCOMPLETE + fault，退出码 4）'
-expect_exit 4 "$PROJECT_ROOT/sample/diffs/diff_incomplete_policy_uncovered.diff"
+printf '\n%s\n' '步骤 3：未覆盖 Policy 的 diff（预期 REQUIRE_APPROVAL，退出码 0）'
+expect_exit 0 "$PROJECT_ROOT/sample/diffs/diff_incomplete_policy_uncovered.diff"

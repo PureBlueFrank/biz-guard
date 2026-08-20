@@ -6,6 +6,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from bizguard.decision.legacy import Decision, FindingStatus, evaluate_change
+from bizguard.risk.engine import score
+
 
 class DecisionState(StrEnum):
     ALLOW = "ALLOW"
@@ -35,7 +38,7 @@ class DecisionInput(BaseModel):
     required_tests: list[str] = Field(default_factory=list)
     owners: list[str] = Field(default_factory=list)
     version_known: bool = True
-    risk_score: float = Field(default=0.0, ge=0.0)
+    risk_score: float | None = Field(default=None, ge=0.0)
     approval_threshold: float = Field(default=0.7, ge=0.0)
 
 
@@ -50,6 +53,7 @@ class DecisionResult(BaseModel):
 
 def decide(data: DecisionInput) -> DecisionResult:
     """Apply the non-negotiable hard-condition order before risk scoring."""
+    risk_score = score(data.findings) if data.risk_score is None else data.risk_score
     critical = [item for item in data.findings if item.violated and item.severity == "critical"]
     if critical:
         return _result(DecisionState.BLOCK, "critical policy violation", data, critical)
@@ -61,9 +65,31 @@ def decide(data: DecisionInput) -> DecisionResult:
     public = [item for item in data.findings if item.public_contract]
     if public or len(set(data.owners)) > 1:
         return _result(DecisionState.REQUIRE_APPROVAL, "public contract or multiple owners", data, public)
-    if data.risk_score >= data.approval_threshold:
+    if risk_score >= data.approval_threshold:
         return _result(DecisionState.REQUIRE_APPROVAL, "risk score requires approval", data, [])
     return _result(DecisionState.ALLOW, "all hard conditions and test evidence satisfied", data, [])
+
+
+def decide_diff(diff_text: str) -> DecisionResult:
+    """Adapt the established deterministic diff pipeline to the v2 public contract."""
+    card = evaluate_change(diff_text)
+    findings = [
+        FindingV2(
+            id=item.finding_id,
+            severity="critical" if item.status is FindingStatus.VIOLATED else "medium",
+            effect=item.message,
+            remediation="resolve the reported policy finding",
+            confidence=1.0,
+            violated=item.status is FindingStatus.VIOLATED,
+            critical_unknown=item.status is FindingStatus.INCOMPLETE,
+        )
+        for item in card.findings
+    ]
+    if card.decision is Decision.ALLOW:
+        return decide(DecisionInput(findings=findings, tests_passed=True))
+    if card.decision is Decision.BLOCK:
+        return decide(DecisionInput(findings=findings, tests_passed=True))
+    return decide(DecisionInput(findings=findings, tests_passed=True, version_known=False))
 
 
 def _approvers(data: DecisionInput) -> list[str]:
@@ -76,6 +102,6 @@ def _result(state: DecisionState, rationale: str, data: DecisionInput, related: 
         rationale=rationale,
         required_tests=sorted(set(data.required_tests)) if state is DecisionState.ALLOW_WITH_TESTS else [],
         required_approvers=_approvers(data) if state is DecisionState.REQUIRE_APPROVAL else [],
-        risk_score=data.risk_score,
+        risk_score=score(data.findings) if data.risk_score is None else data.risk_score,
         evidence=[item.id for item in related],
     )

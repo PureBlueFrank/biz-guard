@@ -13,8 +13,8 @@ from bizguard.decision import (
     FaultCode,
     Finding,
     FindingStatus,
-    evaluate_change,
 )
+from bizguard.decision.v2 import DecisionResult, DecisionState, decide_diff
 from bizguard.context.compiler import ContextCompiler, ContextPack
 from bizguard.change.store import ChangeContextStore
 from bizguard.knowledge.ingest import ingest_directory
@@ -101,9 +101,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_card(_invalid_input_card("无法读取 diff 文件。", [str(diff_path)]))
         return 2
 
-    card = evaluate_change(diff_text)
-    _print_card(card)
-    return _exit_code(card)
+    result = decide_diff(diff_text)
+    _print_result(result)
+    return _exit_code_v2(result)
 
 
 def _doctor(arguments: argparse.Namespace) -> int:
@@ -220,6 +220,10 @@ def _print_card(card: ChangeSafetyCard) -> None:
     print(card.model_dump_json())
 
 
+def _print_result(result: DecisionResult) -> None:
+    print(result.model_dump_json())
+
+
 def _exit_code(card: ChangeSafetyCard) -> int:
     if card.decision is Decision.ALLOW:
         return 0
@@ -234,6 +238,10 @@ def _exit_code(card: ChangeSafetyCard) -> int:
         FaultCode.EMBEDDING_TIMEOUT: 6,
         FaultCode.CACHE_CORRUPT: 7,
     }.get(next(iter(fault_codes), FaultCode.DIFF_PARSE), 3)
+
+
+def _exit_code_v2(result: DecisionResult) -> int:
+    return 1 if result.decision is DecisionState.BLOCK else 0
 
 
 if __name__ == "__main__":
