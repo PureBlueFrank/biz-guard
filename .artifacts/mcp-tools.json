@@ -1,0 +1,586 @@
+{
+  "tools": [
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "从任务、仓库和基线版本真实编译只读 Context Pack；没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "base_revisions": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Base Revisions"
+          },
+          "diff_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Diff Text"
+          },
+          "principal": {
+            "default": "engineering",
+            "title": "Principal",
+            "type": "string"
+          },
+          "repos": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Repos"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Task"
+          },
+          "token_budget": {
+            "default": 2000,
+            "title": "Token Budget",
+            "type": "integer"
+          }
+        },
+        "title": "prepare_changeArguments",
+        "type": "object"
+      },
+      "name": "prepare_change",
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "prepare_changeDictOutput",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "按 ACL、版本和 scope 检索团队知识；只读且没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "caller_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Caller Roles",
+            "type": "array"
+          },
+          "limit": {
+            "default": 5,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "scope",
+          "revision",
+          "caller_roles"
+        ],
+        "title": "search_team_knowledgeArguments",
+        "type": "object"
+      },
+      "name": "search_team_knowledge",
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "search_team_knowledgeDictOutput",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "解释指定的已索引符号及其真实图证据；只读且没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "revision"
+        ],
+        "title": "explain_symbolArguments",
+        "type": "object"
+      },
+      "name": "explain_symbol",
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "explain_symbolDictOutput",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "基于真实图快照分析影响路径、未知边界和必需测试；只读且没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "capability": {
+            "default": "coupon_redemption",
+            "title": "Capability",
+            "type": "string"
+          },
+          "changed_symbol": {
+            "title": "Changed Symbol",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "changed_symbol",
+          "revision"
+        ],
+        "title": "analyze_impactArguments",
+        "type": "object"
+      },
+      "name": "analyze_impact",
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "analyze_impactDictOutput",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "只读分析 unified diff 的变更风险；不写入文件、不调用外部服务，且没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "diff_text": {
+            "title": "Diff Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "diff_text"
+        ],
+        "title": "validate_patchArguments",
+        "type": "object"
+      },
+      "name": "validate_patch",
+      "outputSchema": {
+        "$defs": {
+          "Decision": {
+            "description": "Possible safety outcomes for a submitted change.",
+            "enum": [
+              "ALLOW",
+              "BLOCK",
+              "CHECK_INCOMPLETE"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "Fault": {
+            "description": "Evidence retained for a non-successful check condition.",
+            "properties": {
+              "code": {
+                "$ref": "#/$defs/FaultCode"
+              },
+              "evidence_refs": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evidence Refs",
+                "type": "array"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "evidence_refs"
+            ],
+            "title": "Fault",
+            "type": "object"
+          },
+          "FaultCode": {
+            "description": "Machine-readable causes for incomplete or degraded checks.",
+            "enum": [
+              "input_validation",
+              "diff_parse",
+              "policy_uncovered",
+              "retrieval_empty",
+              "embedding_timeout",
+              "cache_corrupt",
+              "mcp_disconnected"
+            ],
+            "title": "FaultCode",
+            "type": "string"
+          },
+          "Finding": {
+            "description": "Evidence-backed result for one policy check.",
+            "properties": {
+              "evidence_refs": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evidence Refs",
+                "type": "array"
+              },
+              "finding_id": {
+                "title": "Finding Id",
+                "type": "string"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/FindingStatus"
+              }
+            },
+            "required": [
+              "finding_id",
+              "status",
+              "message",
+              "evidence_refs"
+            ],
+            "title": "Finding",
+            "type": "object"
+          },
+          "FindingStatus": {
+            "description": "Completion status of a single policy finding.",
+            "enum": [
+              "passed",
+              "violated",
+              "incomplete"
+            ],
+            "title": "FindingStatus",
+            "type": "string"
+          }
+        },
+        "description": "The sole JSON-compatible output contract for BizGuard decisions.",
+        "properties": {
+          "decision": {
+            "$ref": "#/$defs/Decision"
+          },
+          "faults": {
+            "items": {
+              "$ref": "#/$defs/Fault"
+            },
+            "title": "Faults",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/$defs/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "decision",
+          "findings",
+          "faults"
+        ],
+        "title": "ChangeSafetyCard",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "按语义 catalog 选择必需测试；只读且没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "policy_id"
+        ],
+        "title": "get_required_testsArguments",
+        "type": "object"
+      },
+      "name": "get_required_tests",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Result",
+            "type": "array"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "get_required_testsOutput",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "审批写入在 Phase 5 才启用；此阶段仅暴露 schema，绝不创建审批记录。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "change_context_id": {
+            "title": "Change Context Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "requested_by": {
+            "title": "Requested By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_context_id",
+          "requested_by",
+          "reason"
+        ],
+        "title": "request_approvalArguments",
+        "type": "object"
+      },
+      "name": "request_approval",
+      "outputSchema": {
+        "properties": {
+          "result": {
+            "title": "Result",
+            "type": "null"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "request_approvalOutput",
+        "type": "object"
+      },
+      "title": null
+    },
+    {
+      "_meta": null,
+      "annotations": null,
+      "description": "通过共享决策管线获取变更决定；只读且没有副作用。",
+      "execution": null,
+      "icons": null,
+      "inputSchema": {
+        "properties": {
+          "diff_text": {
+            "title": "Diff Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "diff_text"
+        ],
+        "title": "get_change_decisionArguments",
+        "type": "object"
+      },
+      "name": "get_change_decision",
+      "outputSchema": {
+        "$defs": {
+          "Decision": {
+            "description": "Possible safety outcomes for a submitted change.",
+            "enum": [
+              "ALLOW",
+              "BLOCK",
+              "CHECK_INCOMPLETE"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "Fault": {
+            "description": "Evidence retained for a non-successful check condition.",
+            "properties": {
+              "code": {
+                "$ref": "#/$defs/FaultCode"
+              },
+              "evidence_refs": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evidence Refs",
+                "type": "array"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "evidence_refs"
+            ],
+            "title": "Fault",
+            "type": "object"
+          },
+          "FaultCode": {
+            "description": "Machine-readable causes for incomplete or degraded checks.",
+            "enum": [
+              "input_validation",
+              "diff_parse",
+              "policy_uncovered",
+              "retrieval_empty",
+              "embedding_timeout",
+              "cache_corrupt",
+              "mcp_disconnected"
+            ],
+            "title": "FaultCode",
+            "type": "string"
+          },
+          "Finding": {
+            "description": "Evidence-backed result for one policy check.",
+            "properties": {
+              "evidence_refs": {
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evidence Refs",
+                "type": "array"
+              },
+              "finding_id": {
+                "title": "Finding Id",
+                "type": "string"
+              },
+              "message": {
+                "title": "Message",
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/FindingStatus"
+              }
+            },
+            "required": [
+              "finding_id",
+              "status",
+              "message",
+              "evidence_refs"
+            ],
+            "title": "Finding",
+            "type": "object"
+          },
+          "FindingStatus": {
+            "description": "Completion status of a single policy finding.",
+            "enum": [
+              "passed",
+              "violated",
+              "incomplete"
+            ],
+            "title": "FindingStatus",
+            "type": "string"
+          }
+        },
+        "description": "The sole JSON-compatible output contract for BizGuard decisions.",
+        "properties": {
+          "decision": {
+            "$ref": "#/$defs/Decision"
+          },
+          "faults": {
+            "items": {
+              "$ref": "#/$defs/Fault"
+            },
+            "title": "Faults",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/$defs/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "decision",
+          "findings",
+          "faults"
+        ],
+        "title": "ChangeSafetyCard",
+        "type": "object"
+      },
+      "title": null
+    }
+  ]
+}
