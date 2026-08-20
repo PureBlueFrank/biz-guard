@@ -1,0 +1,71 @@
+version: 1
+diffs:
+  - file: sample/diffs/diff_violation_1.diff
+    expected_decision: BLOCK
+    invariant_ids:
+      - redeem-must-check-idempotency-in-transaction
+    evidence_paths:
+      - registry/contracts.yaml
+      - knowledge/adr-coupon-idempotency.md
+  - file: sample/diffs/diff_violation_2.diff
+    expected_decision: BLOCK
+    invariant_ids:
+      - redeem-must-check-idempotency-in-transaction
+    evidence_paths:
+      - registry/contracts.yaml
+      - knowledge/adr-coupon-idempotency.md
+  - file: sample/diffs/diff_violation_3.diff
+    expected_decision: BLOCK
+    invariant_ids:
+      - redeem-must-check-idempotency-in-transaction
+    evidence_paths:
+      - registry/contracts.yaml
+      - knowledge/adr-coupon-idempotency.md
+  - file: sample/diffs/diff_normal_1.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_normal_2.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_normal_3.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_refactor_1.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_refactor_2.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_bait_1.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_bait_2.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_holdout_1.diff
+    expected_decision: BLOCK
+    invariant_ids:
+      - redeem-must-check-idempotency-in-transaction
+    evidence_paths:
+      - registry/contracts.yaml
+      - knowledge/adr-coupon-idempotency.md
+  - file: sample/diffs/diff_holdout_2.diff
+    expected_decision: ALLOW
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_incomplete_non_unified.txt
+    expected_decision: CHECK_INCOMPLETE
+    invariant_ids: []
+    evidence_paths: []
+  - file: sample/diffs/diff_incomplete_policy_uncovered.diff
+    expected_decision: CHECK_INCOMPLETE
+    invariant_ids: []
+    evidence_paths:
+      - sample/coupon-service/refund_service.py

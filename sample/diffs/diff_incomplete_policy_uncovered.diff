@@ -1,0 +1,10 @@
+diff --git a/sample/coupon-service/refund_service.py b/sample/coupon-service/refund_service.py
+--- a/sample/coupon-service/refund_service.py
++++ b/sample/coupon-service/refund_service.py
+@@ -7,5 +7,5 @@
+ 
+ 
+ def refund(coupon_id: str) -> None:
+     """Record a refund request without applying redemption idempotency Policy."""
+-    del coupon_id
++    logger.info("Refund requested: %s", coupon_id)

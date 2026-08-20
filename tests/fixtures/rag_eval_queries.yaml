@@ -1,0 +1,42 @@
+version: 1
+queries:
+  - id: coupon-idempotency-adr
+    query: 为什么优惠券核销要避免重复提交？
+    ground_truth_document_ids:
+      - adr-coupon-idempotency
+  - id: idempotency-key-semantics
+    query: idempotency_key 在优惠券请求中表示什么？
+    ground_truth_document_ids:
+      - field-idempotency-key
+  - id: structured-logging
+    query: 服务日志怎样才能便于检索和关联？
+    ground_truth_document_ids:
+      - adr-structured-logging
+  - id: python-style
+    query: Python 样例代码要求哪些风格约束？
+    ground_truth_document_ids:
+      - adr-python-style
+  - id: ledger-status
+    query: ledger_status 字段用于什么业务用途？
+    ground_truth_document_ids:
+      - field-ledger-status
+  - id: double-redeem-incident
+    query: 哪个故障复盘记录了自动重试导致的重复核销风险？
+    ground_truth_document_ids:
+      - postmortem-double-redeem
+  - id: retry-boundary
+    query: 重试请求如何通过幂等键界定同一业务请求？
+    ground_truth_document_ids:
+      - field-idempotency-key
+  - id: redemption-protection
+    query: 核销链路为什么需要可追溯的幂等保护？
+    ground_truth_document_ids:
+      - adr-coupon-idempotency
+  - id: audit-ledger-state
+    query: 运营查询和核销结果审计依赖哪个账本字段？
+    ground_truth_document_ids:
+      - field-ledger-status
+  - id: annotations-and-line-width
+    query: 为什么示例 Python 代码使用显式类型注解和 100 字符行宽？
+    ground_truth_document_ids:
+      - adr-python-style

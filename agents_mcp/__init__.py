@@ -1,0 +1,1 @@
+"""BizGuard MCP protocol adapters."""

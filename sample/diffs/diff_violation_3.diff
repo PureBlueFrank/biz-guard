@@ -1,0 +1,10 @@
+diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py
+--- a/sample/coupon-service/redeem_service.py
++++ b/sample/coupon-service/redeem_service.py
+@@ -37,6 +37,5 @@ class RedeemService:
+     def __init__(self, ledger: Ledger) -> None:
+         self.ledger = ledger
+ 
+-    @transaction
+     def redeem(self, coupon_id: str, idempotency_key: str) -> None:
+         IdempotencyStore.check(idempotency_key)

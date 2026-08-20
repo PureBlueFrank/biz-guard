@@ -1,0 +1,18 @@
+version: 1
+invariants:
+  - id: redeem-must-check-idempotency-in-transaction
+    title: 核销必须在事务内先检查幂等键
+    scope: coupon-service
+    target:
+      file: sample/coupon-service/redeem_service.py
+      class: RedeemService
+      function: redeem
+    required_call:
+      before: ledger.redeem
+      call: IdempotencyStore.check
+      argument: idempotency_key
+    transaction_context:
+      decorator: transaction
+    evidence_refs:
+      - registry:coupon-redemption-idempotency-key
+      - knowledge:adr-coupon-idempotency

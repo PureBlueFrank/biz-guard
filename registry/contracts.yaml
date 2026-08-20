@@ -1,0 +1,18 @@
+version: 1
+contracts:
+  - id: coupon-redemption-idempotency-key
+    field: idempotency_key
+    service: coupon-service
+    capability: coupon_redemption
+    owner: payments-platform
+    source: sample/coupon-service/redeem_service.py
+    policy_ids:
+      - redeem-must-check-idempotency-in-transaction
+  - id: merchant-redemption-request-id
+    field: request_id
+    service: merchant-gateway
+    capability: coupon_redemption
+    owner: merchant-integrations
+    source: sample/merchant-gateway/coupon_client.py
+    policy_ids:
+      - redeem-must-check-idempotency-in-transaction
