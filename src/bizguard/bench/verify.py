@@ -39,6 +39,8 @@ class Manifest(BaseModel):
 def verify(manifest_path: Path, suite: str) -> int:
     """Validate only Phase 1-owned fields: manifest and golden contract loading."""
     try:
+        if suite == "phase2":
+            return _verify_phase2(manifest_path)
         manifest_path = manifest_path.resolve()
         manifest = Manifest.model_validate(yaml.safe_load(manifest_path.read_text(encoding="utf-8")))
         if manifest.suite != suite:
@@ -62,6 +64,28 @@ def verify(manifest_path: Path, suite: str) -> int:
         print(f"verification failed: {exc}")
         return 1
     print(f"{len(manifest.tasks)}/{len(manifest.tasks)} {suite} manifest/schema/golden references loaded")
+    return 0
+
+
+def _verify_phase2(manifest_path: Path) -> int:
+    """Verify six frozen semantic mappings without mutating the Phase 1 manifest."""
+    root = manifest_path.resolve().parent.parent.parent
+    from bizguard.semantic.models import load_catalog
+    from bizguard.semantic.required_tests import select_required_tests
+
+    payload = yaml.safe_load((root / "bench/golden/semantic/phase2.yaml").read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("tasks"), list) or len(payload["tasks"]) != 6:
+        raise ValueError("phase2 requires exactly six semantic tasks")
+    catalog = load_catalog(root / "src/bizguard/semantic/catalog.yaml")
+    for task in payload["tasks"]:
+        capability = catalog.capability(task["capability"])
+        if capability.owner != task["owner"]:
+            raise ValueError(f"semantic owner mismatch: {task['id']}")
+        selected = select_required_tests(catalog, task["capability"], task["mandatory_policy"])
+        ids = [item.id for item in selected]
+        if ids != [task["required_test"]] or task["bait_test"] in ids:
+            raise ValueError(f"semantic required-test mismatch: {task['id']}")
+    print("6/6 phase2 semantic tasks verified")
     return 0
 
 
@@ -168,6 +192,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Verify BizGuard golden benchmark contracts.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--suite", required=True)
+    parser.add_argument("--offline", action="store_true", help="Accepted for deterministic Phase 2 verification.")
     args = parser.parse_args()
     raise SystemExit(verify(args.manifest, args.suite))
 

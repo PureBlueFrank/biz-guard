@@ -1,0 +1,8 @@
+version: 1
+tasks:
+  - {id: dto-field, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
+  - {id: ledger, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
+  - {id: state-enum, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
+  - {id: idempotency-key, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
+  - {id: public-api, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
+  - {id: private-method, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
