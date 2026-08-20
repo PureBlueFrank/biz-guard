@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
+import subprocess
+from typing import Any, cast
 
 import scripts.run_benchmark as benchmark
+import pytest
 import yaml  # type: ignore[import-untyped]
 from pytest import MonkeyPatch
 
@@ -12,6 +15,19 @@ from scripts.run_benchmark import BASELINES, TRANSCRIPT, _predict, run
 
 ROOT = Path(__file__).parents[1]
 DATASET = ROOT / "bench/ablations/tasks.yaml"
+
+
+def _live_transcript() -> dict[str, Any]:
+    transcript = cast(dict[str, Any], json.loads(TRANSCRIPT.read_text(encoding="utf-8")))
+    transcript.update(
+        {
+            "track": "live",
+            "agent": "codex-cli",
+            "model": "codex-test-model",
+            "codex_thread_id": "codex-thread-1",
+        }
+    )
+    return transcript
 
 
 def test_all_baselines_execute_real_fixtures_and_measure_distinct_results() -> None:
@@ -51,9 +67,64 @@ def test_offline_trajectory_is_loaded_from_recorded_mcp_transcript() -> None:
     transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
 
     assert output["agent_trajectory"] == transcript
+    assert transcript["track"] == "recorded"
     assert transcript["tool_calls"][0]["tool"] == "bizguard.validate_patch"
     assert all(transcript.get(field) for field in ("agent", "model", "prompt", "bizguard_version", "revision", "task_id", "decision", "duration_ms"))
     assert "diff_text" in transcript["tool_calls"][0]["input"]
+
+
+def test_live_track_rejects_a_recorded_transcript(monkeypatch: MonkeyPatch) -> None:
+    transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
+
+    monkeypatch.setenv("BIZGUARD_LIVE_AGENT_COMMAND", "fake-live-agent")
+    monkeypatch.setattr(
+        "scripts.run_benchmark.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout=json.dumps(transcript),
+            stderr="",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="explicitly marked as live"):
+        benchmark.run(DATASET, offline=False)
+
+
+def test_live_track_replays_exact_mcp_output(monkeypatch: MonkeyPatch) -> None:
+    transcript = _live_transcript()
+    monkeypatch.setenv("BIZGUARD_LIVE_AGENT_COMMAND", "python scripts/codex_agent.py")
+    monkeypatch.setattr(
+        "scripts.run_benchmark.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout=json.dumps(transcript),
+            stderr="",
+        ),
+    )
+
+    output = benchmark.run(DATASET, offline=False)
+
+    assert output["agent_trajectory"] == transcript
+
+
+def test_live_track_rejects_tampered_mcp_output(monkeypatch: MonkeyPatch) -> None:
+    transcript = _live_transcript()
+    transcript["tool_calls"][0]["output"]["findings"] = []
+    monkeypatch.setenv("BIZGUARD_LIVE_AGENT_COMMAND", "python scripts/codex_agent.py")
+    monkeypatch.setattr(
+        "scripts.run_benchmark.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout=json.dumps(transcript),
+            stderr="",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="output does not match MCP replay"):
+        benchmark.run(DATASET, offline=False)
 
 
 def test_full_matches_all_twelve_golden_task_outcomes() -> None:

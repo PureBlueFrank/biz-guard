@@ -40,3 +40,17 @@ def test_lifecycle_rejects_unmeasured_promotion() -> None:
 def test_proto_required_fields_are_checked_against_full_file_content() -> None:
     full_content = "syntax = 'proto3';\nmessage Coupon {\n  string name = 1;\n}\n"
     assert validate_artifact("published-dto-backward-compatible", full_content, "coupon.proto")["violated"] is True
+
+
+def test_openapi_required_fields_must_have_matching_properties() -> None:
+    full_content = """\
+openapi: 3.0.0
+components:
+  schemas:
+    Coupon:
+      required: [redemptionId, status]
+      properties:
+        redemptionId: {type: string}
+"""
+
+    assert validate_artifact("published-dto-backward-compatible", full_content, "openapi.yaml")["violated"] is True

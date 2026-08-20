@@ -7,6 +7,8 @@ from bizguard.graph.indexer import index
 
 
 class ContractProvider:
+    """Collect interface-contract evidence from an indexed snapshot."""
+
     def __init__(self, repos: Path, revision: str) -> None:
         self.repos = repos
         self.revision = revision

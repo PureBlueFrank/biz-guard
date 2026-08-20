@@ -15,6 +15,7 @@ from bizguard.graph.models import EdgeKind, GraphEdge, GraphNode, GraphSnapshot,
 
 
 def index(repos: Path, revision: str) -> GraphSnapshot:
+    """Build a graph snapshot from repository source and contract files."""
     nodes: dict[str, GraphNode] = {}
     edges: list[GraphEdge] = []
     facts: list[tuple[str, Path, JavaFact]] = []

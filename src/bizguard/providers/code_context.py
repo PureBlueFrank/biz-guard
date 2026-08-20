@@ -7,6 +7,8 @@ from bizguard.graph.indexer import index
 
 
 class CodeContextProvider:
+    """Collect static-code evidence from an indexed repository snapshot."""
+
     def __init__(self, repos: Path, revision: str) -> None:
         self.repos = repos
         self.revision = revision

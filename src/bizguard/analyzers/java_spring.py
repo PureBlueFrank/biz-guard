@@ -14,6 +14,8 @@ _PARSER = Parser(Language(tsjava.language()))
 
 @dataclass(frozen=True)
 class JavaFact:
+    """Represent one Java syntax fact with source evidence."""
+
     kind: str
     name: str
     node_id: str
@@ -28,6 +30,7 @@ class JavaFact:
 
 
 def analyze(path: Path, repository: str, revision: str) -> list[JavaFact]:
+    """Extract Java facts from a source file."""
     raw = path.read_bytes()
     tree = _PARSER.parse(raw)
     relative = str(path).split(f"{repository}/", 1)[-1]

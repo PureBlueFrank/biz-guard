@@ -30,6 +30,8 @@ class LocalVectorAdapter:
 
 
 class HybridSearch:
+    """Search governed knowledge using BM25 and optional vector scores."""
+
     def __init__(
         self,
         repository: KnowledgeRepository,

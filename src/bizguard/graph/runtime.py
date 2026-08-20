@@ -7,6 +7,7 @@ from .models import EdgeKind, GraphEdge, GraphSnapshot
 
 
 def import_trace(snapshot: GraphSnapshot, path: Path) -> GraphSnapshot:
+    """Add runtime call observations from a trace file to a snapshot."""
     raw = json.loads(path.read_text(encoding="utf-8"))
     revision = str(raw["revision"])
     if revision != snapshot.revision:

@@ -10,6 +10,8 @@ from bizguard.graph.indexer import index
 
 
 class SymbolExplanation(BaseModel):
+    """Describe an indexed symbol and the evidence linked to it."""
+
     symbol: str
     label: str
     kind: str
@@ -18,6 +20,8 @@ class SymbolExplanation(BaseModel):
 
 
 class SymbolService:
+    """Resolve read-only symbol explanations from repository graphs."""
+
     def __init__(self, repositories_root: Path) -> None:
         self._root = repositories_root
 

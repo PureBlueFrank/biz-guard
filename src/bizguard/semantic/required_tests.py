@@ -8,6 +8,7 @@ from bizguard.semantic.models import CatalogRequiredTest, SemanticCatalog
 def select_required_tests(
     catalog: SemanticCatalog, capability: str, policy_id: str
 ) -> list[CatalogRequiredTest]:
+    """Select tests matching a capability, policy, and owning team."""
     owner = catalog.capability(capability).owner
     return [
         test

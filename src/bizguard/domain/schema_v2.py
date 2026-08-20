@@ -11,12 +11,16 @@ from bizguard.domain.enums import PolicyMode
 
 
 class PolicyLifecycle(StrEnum):
+    """Enumerate supported policy lifecycle states."""
+
     DRAFT = "draft"
     ACTIVE = "active"
     RETIRED = "retired"
 
 
 class PolicyV2(BaseModel):
+    """Define lifecycle metadata for a version-two policy."""
+
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
@@ -27,6 +31,8 @@ class PolicyV2(BaseModel):
 
 
 class InvariantsV2(BaseModel):
+    """Define the version-two policy invariants document."""
+
     model_config = ConfigDict(extra="forbid")
 
     version: Literal[2]

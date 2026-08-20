@@ -9,6 +9,8 @@ from bizguard.knowledge.models import KnowledgeEntry
 
 
 class KnowledgeRepository:
+    """Store and search knowledge entries in SQLite."""
+
     def __init__(self, path: Path) -> None:
         self.connection = sqlite3.connect(path)
         self.connection.row_factory = sqlite3.Row

@@ -8,6 +8,8 @@ from typing import Any, cast
 
 
 class NodeKind(StrEnum):
+    """Supported graph node categories."""
+
     ORGANIZATION = "organization"
     DEPLOYMENT = "deployment"
     CODE = "code"
@@ -19,6 +21,8 @@ class NodeKind(StrEnum):
 
 
 class EdgeKind(StrEnum):
+    """Supported relationships between graph nodes."""
+
     DECLARES = "DECLARES"
     CALLS = "CALLS"
     IMPLEMENTS = "IMPLEMENTS"
@@ -44,6 +48,8 @@ class EdgeKind(StrEnum):
 
 @dataclass(frozen=True)
 class GraphNode:
+    """A versioned node in the dependency graph."""
+
     id: str
     kind: NodeKind
     label: str
@@ -53,6 +59,8 @@ class GraphNode:
 
 @dataclass(frozen=True)
 class GraphEdge:
+    """An evidence-carrying relationship between graph nodes."""
+
     source_id: str
     target_id: str
     kind: EdgeKind
@@ -70,6 +78,8 @@ class GraphEdge:
 
 @dataclass
 class GraphSnapshot:
+    """A complete graph view for one source revision."""
+
     revision: str
     metadata: dict[str, str]
     content_digest: str = ""

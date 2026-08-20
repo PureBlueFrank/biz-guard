@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 
 class PolicyMode(StrEnum):
+    """Enumerate the supported policy enforcement stages."""
+
     DRAFT = "draft"
     SHADOW = "shadow"
     WARNING = "warning"
@@ -15,11 +17,15 @@ class PolicyMode(StrEnum):
 
 
 class PromotionGates(BaseModel):
+    """Define the measured thresholds required for policy promotion."""
+
     min_samples: int = Field(ge=1)
     max_false_positive_rate: float = Field(ge=0.0, le=1.0)
 
 
 class PolicyLifecycle(BaseModel):
+    """Track a policy's enforcement mode and promotion evidence."""
+
     policy_id: str
     mode: PolicyMode = PolicyMode.DRAFT
     samples: int = 0

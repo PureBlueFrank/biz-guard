@@ -9,11 +9,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class Domain(BaseModel):
+    """Represent a business domain in the semantic catalog."""
+
     id: str
     name: str
 
 
 class Capability(BaseModel):
+    """Represent an owned capability and its repositories."""
+
     id: str
     name: str
     owner: str
@@ -21,12 +25,16 @@ class Capability(BaseModel):
 
 
 class Owner(BaseModel):
+    """Represent a catalog owner and its repository scope."""
+
     id: str
     name: str
     repositories: list[str]
 
 
 class Entity(BaseModel):
+    """Represent a catalog entity bound to a canonical symbol."""
+
     id: str
     capability: str
     repository: str
@@ -34,12 +42,16 @@ class Entity(BaseModel):
 
 
 class State(BaseModel):
+    """Represent a named state associated with a catalog entity."""
+
     id: str
     entity: str
     value: str
 
 
 class Invariant(BaseModel):
+    """Represent an owned business invariant and its source."""
+
     id: str
     capability: str
     owner: str
@@ -48,6 +60,8 @@ class Invariant(BaseModel):
 
 
 class Policy(BaseModel):
+    """Represent the policy metadata that enforces an invariant."""
+
     id: str
     capability: str
     owner: str
@@ -57,6 +71,8 @@ class Policy(BaseModel):
 
 
 class CatalogRequiredTest(BaseModel):
+    """Describe a governed test required by a catalog policy."""
+
     id: str
     capability: str
     owner: str
@@ -67,6 +83,8 @@ class CatalogRequiredTest(BaseModel):
 
 
 class SemanticCatalog(BaseModel):
+    """Provide a validated, immutable view of semantic catalog data."""
+
     model_config = ConfigDict(extra="forbid")
 
     schema_version: int
@@ -93,6 +111,7 @@ class SemanticCatalog(BaseModel):
 
 
 def load_catalog(path: Path) -> SemanticCatalog:
+    """Load and validate a semantic catalog from YAML."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError("semantic catalog must be a mapping")

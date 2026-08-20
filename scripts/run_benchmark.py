@@ -37,6 +37,20 @@ _OUTCOMES = {
     DecisionState.REQUIRE_APPROVAL: "approval",
     DecisionState.BLOCK: "block",
 }
+_TRANSCRIPT_FIELDS = {
+    "track",
+    "agent",
+    "model",
+    "prompt",
+    "bizguard_version",
+    "revision",
+    "task_id",
+    "decision",
+    "duration_ms",
+    "tool_calls",
+    "diff_sha256",
+}
+_MCP_DECISIONS = {"ALLOW": "allow", "BLOCK": "block", "CHECK_INCOMPLETE": "approval"}
 
 
 def _read_diff(task: dict[str, Any], dataset: Path) -> tuple[Path, str]:
@@ -202,36 +216,66 @@ def _measure(
 
 def _offline_transcript(tasks: list[dict[str, Any]], dataset: Path, revision: object) -> dict[str, Any]:
     transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
-    required = {"agent", "model", "prompt", "bizguard_version", "revision", "task_id", "decision", "duration_ms", "tool_calls", "diff_sha256"}
-    if not isinstance(transcript, dict) or not required.issubset(transcript):
+    if not isinstance(transcript, dict) or not _TRANSCRIPT_FIELDS.issubset(transcript):
         raise ValueError("recorded agent transcript is incomplete")
+    if transcript["track"] != "recorded":
+        raise ValueError("offline transcript must be explicitly marked as recorded")
     task = next((item for item in tasks if item["id"] == transcript["task_id"]), None)
     if task is None or transcript["revision"] != revision:
         raise ValueError("recorded agent transcript does not match dataset")
     _, diff_text = _read_diff(task, dataset)
     if transcript["diff_sha256"] != sha256(diff_text.encode()).hexdigest():
         raise ValueError("recorded agent transcript does not match fixture")
+    _validate_transcript_metadata(transcript, task)
     calls = transcript["tool_calls"]
     if not isinstance(calls, list) or not calls or any(not isinstance(call, dict) for call in calls):
         raise ValueError("recorded agent transcript has no MCP calls")
-    _validate_tool_calls(calls)
+    _validate_tool_calls(calls, diff_text, str(transcript["decision"]))
     return transcript
 
 
-def _validate_tool_calls(calls: list[dict[str, Any]]) -> None:
-    """Replay transcript calls through FastMCP so recorded inputs remain schema-valid."""
+def _validate_transcript_metadata(transcript: dict[str, Any], task: dict[str, Any]) -> None:
+    """Reject incomplete or self-reported metadata that cannot identify the run."""
+    for field in ("agent", "model", "prompt", "decision"):
+        if not isinstance(transcript.get(field), str) or not transcript[field]:
+            raise ValueError(f"agent transcript has invalid {field}")
+    if transcript["prompt"] != task.get("prompt"):
+        raise ValueError("agent transcript prompt does not match task")
+    duration = transcript.get("duration_ms")
+    if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0:
+        raise ValueError("agent transcript has invalid duration_ms")
+
+
+def _validate_tool_calls(
+    calls: list[dict[str, Any]],
+    diff_text: str,
+    transcript_decision: str,
+) -> None:
+    """Replay the exact call and require recorded output and decision to match FastMCP."""
     from agents_mcp.server import mcp
     from mcp.server.fastmcp.exceptions import ToolError
 
+    if len(calls) != 1:
+        raise ValueError("agent transcript must contain exactly one MCP call")
     for call in calls:
         tool = call.get("tool")
         arguments = call.get("input")
         if tool != "bizguard.validate_patch" or not isinstance(arguments, dict):
             raise ValueError("recorded agent transcript has an unsupported tool call")
+        if arguments != {"diff_text": diff_text}:
+            raise ValueError("recorded agent transcript MCP input does not match fixture")
         try:
-            asyncio.run(mcp.call_tool("validate_patch", arguments))
+            result = asyncio.run(mcp.call_tool("validate_patch", arguments))
         except (ToolError, ValueError) as exc:
             raise ValueError("recorded agent transcript tool input fails MCP schema validation") from exc
+        if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], dict):
+            raise ValueError("BizGuard MCP replay returned no structured output")
+        output = call.get("output")
+        if not isinstance(output, dict) or output != result[1]:
+            raise ValueError("recorded agent transcript output does not match MCP replay")
+        decision = result[1].get("decision")
+        if not isinstance(decision, str) or _MCP_DECISIONS.get(decision) != transcript_decision:
+            raise ValueError("recorded agent transcript decision does not match MCP replay")
 
 
 def _live_transcript(tasks: list[dict[str, Any]], dataset: Path, revision: object) -> dict[str, Any]:
@@ -239,16 +283,42 @@ def _live_transcript(tasks: list[dict[str, Any]], dataset: Path, revision: objec
     command = os.environ.get("BIZGUARD_LIVE_AGENT_COMMAND")
     if not command:
         raise RuntimeError("--live requires BIZGUARD_LIVE_AGENT_COMMAND to invoke the configured LLM agent")
-    completed = subprocess.run(shlex.split(command), capture_output=True, check=True, text=True)
+    task_id = os.environ.get("BIZGUARD_LIVE_TASK_ID", str(tasks[0]["id"]))
+    if not any(str(item["id"]) == task_id for item in tasks):
+        raise ValueError(f"unknown BIZGUARD_LIVE_TASK_ID: {task_id}")
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "BIZGUARD_LIVE_DATASET": str(dataset.resolve()),
+            "BIZGUARD_LIVE_TASK_ID": task_id,
+            "BIZGUARD_LIVE_REVISION": str(revision),
+        }
+    )
+    completed = subprocess.run(
+        shlex.split(command),
+        capture_output=True,
+        check=True,
+        text=True,
+        env=environment,
+    )
     transcript = json.loads(completed.stdout)
-    if not isinstance(transcript, dict):
-        raise ValueError("live agent did not emit a JSON transcript")
+    if not isinstance(transcript, dict) or not _TRANSCRIPT_FIELDS.issubset(transcript):
+        raise ValueError("live agent did not emit a complete JSON transcript")
+    if transcript["track"] != "live":
+        raise ValueError("live agent transcript must be explicitly marked as live")
+    if str(transcript["model"]).startswith("recorded-"):
+        raise ValueError("live agent transcript cannot use a recorded model identity")
     task = next((item for item in tasks if item["id"] == transcript.get("task_id")), None)
     if task is None or transcript.get("revision") != revision:
         raise ValueError("live agent transcript does not match dataset")
     _, diff_text = _read_diff(task, dataset)
     if transcript.get("diff_sha256") != sha256(diff_text.encode()).hexdigest():
         raise ValueError("live agent transcript does not match fixture")
+    _validate_transcript_metadata(transcript, task)
+    calls = transcript["tool_calls"]
+    if not isinstance(calls, list) or not calls or any(not isinstance(call, dict) for call in calls):
+        raise ValueError("live agent transcript has no MCP calls")
+    _validate_tool_calls(calls, diff_text, str(transcript["decision"]))
     return transcript
 
 
@@ -278,12 +348,23 @@ def main() -> int:
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument(
+        "--transcript-out",
+        type=Path,
+        help="write the validated agent trajectory as a standalone replay artifact",
+    )
     args = parser.parse_args()
     if args.offline == args.live:
         return 2
     output = run(args.dataset, args.offline)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(output, indent=2, sort_keys=True), encoding="utf-8")
+    if args.transcript_out is not None:
+        args.transcript_out.parent.mkdir(parents=True, exist_ok=True)
+        args.transcript_out.write_text(
+            json.dumps(output["agent_trajectory"], indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
     return 0
 
 

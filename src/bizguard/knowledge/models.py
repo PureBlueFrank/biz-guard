@@ -9,12 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class KnowledgeStatus(StrEnum):
+    """Lifecycle states for governed knowledge."""
+
     DRAFT = "draft"
     PUBLISHED = "published"
     STALE = "stale"
 
 
 class SecurityLabel(StrEnum):
+    """Access sensitivity levels for knowledge entries."""
+
     INTERNAL = "internal"
     RESTRICTED = "restricted"
     PUBLIC = "public"
@@ -51,6 +55,8 @@ class KnowledgeEntry(BaseModel):
 
 
 class SearchRequest(BaseModel):
+    """Parameters and caller context for governed knowledge search."""
+
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1)
@@ -62,6 +68,8 @@ class SearchRequest(BaseModel):
 
 
 class CandidateTrace(BaseModel):
+    """Per-candidate ranking scores and any exclusion reason."""
+
     id: str
     bm25_score: float | None = None
     vector_score: float | None = None
@@ -70,6 +78,8 @@ class CandidateTrace(BaseModel):
 
 
 class SearchResult(BaseModel):
+    """Governed knowledge matches with ranking diagnostics."""
+
     entries: list[KnowledgeEntry]
     traces: list[CandidateTrace]
     mandatory_policy_ids: list[str]

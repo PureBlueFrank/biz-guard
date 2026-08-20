@@ -44,6 +44,7 @@ def ingest_file(
 
 
 def ingest_directory(directory: Path, repository: KnowledgeRepository) -> list[KnowledgeEntry]:
+    """Validate and store every Markdown knowledge record in a directory."""
     return [ingest_file(path, repository) for path in sorted(directory.glob("*.md"))]
 
 

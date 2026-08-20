@@ -10,6 +10,7 @@ from .store import GraphStore
 
 
 def main() -> int:
+    """Build and persist a graph snapshot from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--repos", type=Path, required=True)
     parser.add_argument("--revision-set", type=Path, required=True)

@@ -9,6 +9,8 @@ from .lifecycle import PolicyMode
 
 
 class PolicyDefinition(BaseModel):
+    """Describe a registered policy and its enforcement metadata."""
+
     id: str
     validator: str
     scope: str
@@ -20,6 +22,7 @@ class PolicyDefinition(BaseModel):
 
 
 def load_registry(path: Path) -> list[PolicyDefinition]:
+    """Load and validate policy definitions from a YAML registry."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or not isinstance(raw.get("policies"), list):
         raise ValueError("policy registry must contain a policies list")

@@ -11,6 +11,8 @@ from bizguard.risk.engine import score
 
 
 class DecisionState(StrEnum):
+    """Enumerate the possible aggregate change decisions."""
+
     ALLOW = "ALLOW"
     ALLOW_WITH_TESTS = "ALLOW_WITH_TESTS"
     REQUIRE_APPROVAL = "REQUIRE_APPROVAL"
@@ -33,6 +35,8 @@ class FindingV2(BaseModel):
 
 
 class DecisionInput(BaseModel):
+    """Define evidence and thresholds consumed by the decision engine."""
+
     findings: list[FindingV2] = Field(default_factory=list)
     tests_passed: bool | None = None
     required_tests: list[str] = Field(default_factory=list)
@@ -43,6 +47,8 @@ class DecisionInput(BaseModel):
 
 
 class DecisionResult(BaseModel):
+    """Describe the aggregate decision and its required follow-up."""
+
     decision: DecisionState
     rationale: str
     required_tests: list[str] = Field(default_factory=list)

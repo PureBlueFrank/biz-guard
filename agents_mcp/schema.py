@@ -11,11 +11,13 @@ from .server import mcp
 
 
 def export_schema() -> dict[str, object]:
+    """Return the registered MCP tool schemas as JSON-compatible data."""
     tools = asyncio.run(mcp.list_tools())
     return {"tools": [tool.model_dump(by_alias=True, mode="json") for tool in tools]}
 
 
 def main() -> None:
+    """Export MCP tool schemas from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()

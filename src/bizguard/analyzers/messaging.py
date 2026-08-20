@@ -5,6 +5,7 @@ from .java_spring import JavaFact, analyze
 
 
 def analyze_messaging(path: Path, repository: str, revision: str) -> list[JavaFact]:
+    """Extract messaging-relevant Java facts from a source file."""
     return [
         fact
         for fact in analyze(path, repository, revision)

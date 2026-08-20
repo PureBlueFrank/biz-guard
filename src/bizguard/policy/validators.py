@@ -4,6 +4,8 @@ import ast
 import re
 from pathlib import Path
 
+import yaml  # type: ignore[import-untyped]
+
 from bizguard.decision import Finding, FindingStatus
 from bizguard.diff_parser import ParsedDiff
 from bizguard.policy.invariants import Invariant
@@ -22,7 +24,9 @@ def validate_artifact(policy_id: str, source: str, path: str, severity: str = "h
     violated = False
     message = "artifact is compatible"
     if suffix in {".yaml", ".yml", ".json"} and ("openapi" in lower or "paths:" in lower):
-        violated = bool(re.search(r"^\s*-\s*(id|status|code)\s*$", source, re.MULTILINE))
+        violated = _openapi_has_missing_required_field(source) or bool(
+            re.search(r"^\s*-\s*(id|status|code)\s*$", source, re.MULTILINE)
+        )
         message = "published OpenAPI field removed" if violated else message
     elif suffix == ".proto":
         violated = bool(not re.search(r"\b\w+\s+(id|status)\s*=", source) and "message" in lower)
@@ -46,6 +50,29 @@ def validate_artifact(policy_id: str, source: str, path: str, severity: str = "h
         "confidence": 1.0,
         "evidence": [path],
     }
+
+
+def _openapi_has_missing_required_field(source: str) -> bool:
+    """Detect a schema whose required list references a missing property."""
+    try:
+        document = yaml.safe_load(source)
+    except yaml.YAMLError:
+        return False
+
+    def visit(value: object) -> bool:
+        if isinstance(value, dict):
+            required = value.get("required")
+            properties = value.get("properties")
+            if isinstance(required, list) and isinstance(properties, dict):
+                property_names = {str(name) for name in properties}
+                if any(isinstance(name, str) and name not in property_names for name in required):
+                    return True
+            return any(visit(item) for item in value.values())
+        if isinstance(value, list):
+            return any(visit(item) for item in value)
+        return False
+
+    return visit(document)
 
 
 def validate_invariant(

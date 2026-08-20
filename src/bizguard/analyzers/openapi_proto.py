@@ -10,6 +10,8 @@ from bizguard.graph.ids import api_id, proto_id
 
 @dataclass(frozen=True)
 class ContractFact:
+    """Represent one extracted API contract fact."""
+
     kind: str
     name: str
     node_id: str
@@ -19,6 +21,7 @@ class ContractFact:
 
 
 def analyze_openapi(path: Path, service: str, revision: str) -> list[ContractFact]:
+    """Extract endpoint and schema-field facts from an OpenAPI document."""
     root = yaml.compose(path.read_text(encoding="utf-8"))
     facts: list[ContractFact] = []
     relative = str(path).split(f"{service}/", 1)[-1]
@@ -66,6 +69,7 @@ def analyze_openapi(path: Path, service: str, revision: str) -> list[ContractFac
 
 
 def analyze_proto(path: Path, revision: str, repository: str = "coupon-contract") -> list[ContractFact]:
+    """Extract scalar field facts from a Protocol Buffers document."""
     facts: list[ContractFact] = []
     package = "default"
     message = ""

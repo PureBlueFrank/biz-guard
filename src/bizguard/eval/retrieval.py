@@ -18,6 +18,7 @@ from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
 def evaluate(
     dataset: Path, knowledge_directory: Path | None = None, *, strict: bool = True
 ) -> dict[str, Any]:
+    """Evaluate retrieval behavior against the frozen Phase 2 dataset."""
     payload = yaml.safe_load(dataset.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("tasks"), list):
         raise ValueError("retrieval dataset must contain tasks")
@@ -80,6 +81,7 @@ def evaluate(
 
 
 def main() -> None:
+    """Run retrieval evaluation from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--offline", action="store_true")

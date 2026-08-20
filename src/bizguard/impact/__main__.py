@@ -14,6 +14,7 @@ from bizguard.impact.service import ImpactService
 
 
 def main() -> int:
+    """Run diff-driven impact analysis from command-line arguments."""
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     analyze_parser = commands.add_parser("analyze")

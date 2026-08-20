@@ -23,6 +23,8 @@ _SEMANTIC_CONTINUATIONS = _LAYER_KINDS["L2"] | _LAYER_KINDS["L3"]
 
 @dataclass(frozen=True)
 class ImpactResult:
+    """The layered path and evidence produced by impact analysis."""
+
     layers: dict[str, list[str]]
     path: list[str]
     evidence: list[Evidence]

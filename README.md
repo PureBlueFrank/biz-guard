@@ -1,32 +1,26 @@
 # BizGuard：给 AI 编程助手加一道业务安全门禁
 
-**BizGuard 是一个开源验证项目：它在 AI 编程助手改代码前，检查改动是否触犯了系统中容易被忽略的业务规则。**
+**BizGuard 是面向复杂 Java 业务系统的开源验证项目：它为 Claude Code、Codex、Cursor 等 Coding Agent 补充业务上下文、跨服务影响证据和确定性变更门禁。**
 
-它可以与 Claude Code、Codex 一类的编程助手配合：助手负责写代码，BizGuard 负责在关键规则被破坏时给出可追溯的拦截结论。它不是生产级安全产品，也不替代人工判断。
+现有 Agent 继续负责代码搜索、生成、编辑和测试，BizGuard 专注回答“改之前必须知道什么、这次变更可能影响谁、满足什么条件才允许继续”。它不是生产级安全产品，也不替代代码评审和领域专家判断。
 
-## 它解决什么问题？
+## 项目背景
 
-AI 很会按需求改代码，却未必知道你的系统有哪些“不能碰”的规矩。更麻烦的是，这些规矩常常没有写在注释里：例如一次优惠券只能核销一次、账本状态必须一致、对外返回的数据字段不能随意删除。
+Claude Code、Codex、Cursor 等 Coding Agent 已经能够完成多文件修改、命令执行、测试修复和 Diff 审查。但在优惠券、交易、履约、供应链等复杂业务系统中，**代码只是业务语义的不完整投影：代码改得出来，不等于业务改得安全。**
 
-举个例子：AI 修改优惠券核销逻辑时，为了“精简代码”删掉了幂等键检查。幂等键可以理解为“这次请求的唯一编号”；有它，重复点击或网络重试不会把同一张券核销两次。代码也许仍能编译、普通测试也可能通过，但用户重复提交后就可能发生重复核销。
+一个看似冗余的判断，可能承担旧链路兼容职责；一个当前仓库里没有引用的字段，可能仍通过 DTO、RPC、MQ 或离线任务被下游消费；一次状态更新的顺序，也可能承载幂等、一致性或资损防护语义。以优惠券核销为例，Agent 为了“精简代码”删除幂等检查后，代码仍可能编译并通过普通测试，却会在重复点击或网络重试时造成重复核销。
 
-传统的 LLM 代码审查更像是事后请另一位 AI 猜一猜“这里是否有风险”：有帮助，但结果是概率性的。BizGuard 则在变更进入下一步前，把明确的业务规则作为可执行的 Policy（策略），用语法树检查（AST，程序结构而非纯文本）和固定规则得出确定性结论：同一份输入可离线重放，结论不会靠模型临场发挥。
+真正决定“这段代码能不能改”的知识，往往分散在接口契约、技术方案、故障复盘、运行时链路和团队经验中。通用 Agent 能读懂当前代码，却无法凭空知道未被记录的团队知识，也难以仅靠单仓库的局部信息，稳定回答三个问题：
 
-## 为什么做这个项目？
+1. 修改前必须遵守哪些业务不变量和历史约束？
+2. 这次变更会影响哪些字段、接口、服务和下游调用方？
+3. 需要补充哪些检查、测试或人工审批，变更才可以继续？
 
-复杂业务系统里藏着许多业务不变量——也就是“无论怎么改，始终必须成立”的约束，例如：
+项目指令、RAG 和 LLM Review 都能提供线索，但还不足以单独成为业务安全边界：知识可能过期，Prompt 可能被弱化，跨服务影响可能没有查全，概率性判断也难以作为可重复、可审计的强制门禁。尤其当证据不足时，“没有发现风险”不应被等同于“已经证明安全”。
 
-- 幂等：重复请求不能重复扣款、核销或发货；
-- 账本一致性：交易状态与账本记录不能相互矛盾；
-- DTO 兼容性：DTO 是服务之间传递的数据结构，对外字段不能悄悄破坏调用方。
+BizGuard 因此被设计为一层独立于模型和 Agent 品牌的**业务感知变更安全控制面**。它不重新实现通用 Coding Agent，而是将分散的业务知识转化为有来源的上下文、可执行的 Policy 和可追溯的影响证据；能确定性检查的规则交给 AST 与固定校验器，证据不足的边界则明确标记为未知并转人工，最终收敛为 `ALLOW`、`ALLOW_WITH_TESTS`、`REQUIRE_APPROVAL` 或 `BLOCK`。
 
-这些知识往往散落在历史事故、接口契约、团队文档和多个服务中。现有 CodeRabbit 等方案主要依赖事后 LLM review，适合发现线索，却不能保证每次都识别出隐藏的不变量。
-
-BizGuard 的做法是把重要不变量整理成 Policy，以 AST 校验、影响分析和证据链支撑决策。它遵循三条底线：
-
-- **确定性**：结论可离线重放；
-- **证据链**：每条 `BLOCK` 都能追溯到规则、变更和相关证据；
-- **未知不装作安全**：信息不完整时返回 `CHECK_INCOMPLETE` 或 `REQUIRE_APPROVAL`，而不是武断地 `ALLOW`。
+BizGuard 的目标不是让 Agent 生成更多代码，而是让 Agent 面对企业隐性业务规则时少猜测、尽早暴露关键影响与未知边界，并让每一次放行、阻断和人工接管都有证据可查。
 
 ## 技术架构
 
@@ -76,7 +70,10 @@ biz-guard/
 ./scripts/demo.sh
 ```
 
-脚本会演示一个“原生 Coding Agent 对照组”（离线、确定性的 scripted 模拟基线）认为改动看似合理而放行；随后 BizGuard 对同一份 diff 做检查并返回 `BLOCK`。这不是对真实 Claude Code 或 Codex 能力的测量；只有 benchmark 的 `--live` 模式并配置真实 Agent 命令时，才会运行真实 Agent。
+脚本会依次实际运行 6 个可自校验场景：启发式对照组、违规 `BLOCK`、正常
+`ALLOW`、非法输入 `CHECK_INCOMPLETE`、动态边界 `REQUIRE_APPROVAL`，以及跨服务影响路径。
+其中对照组是离线启发式，不代表真实 Claude Code 或 Codex；只有 benchmark 的 `--live`
+模式并配置 Agent 命令时，才会运行真实 Agent。
 
 也可以直接查看违规样例：
 
@@ -100,7 +97,7 @@ cd biz-guard
 # 常规安装
 pip install -e .
 
-# 运行当前工作区的全部测试（当前可收集 259 个）
+# 运行当前工作区的全部测试
 pytest
 ```
 
@@ -156,7 +153,28 @@ MCP（Model Context Protocol）是让 AI 助手调用外部能力的标准接口
 ./scripts/verify_install.sh --offline
 ```
 
-该脚本会检查本地诊断和 CI 慢速复检，默认使用跨服务 DTO 变更 fixture。
+该脚本会检查 8 个 MCP 工具的真实调用、本地诊断和 CI 慢速复检，默认使用
+`bench/fixtures/phase5/dynamic-mapper.diff` 验证动态边界、证据与审批责任人。
+
+### 真实 Codex benchmark 轨道
+
+先选择当前 Codex 账号可用的模型，再让 `run_benchmark.py --live` 调用只读的 Codex CLI
+适配器：
+
+```bash
+export BIZGUARD_CODEX_MODEL="<已启用的 Codex 模型>"
+BIZGUARD_LIVE_AGENT_COMMAND="python scripts/codex_agent.py" \
+BIZGUARD_LIVE_TASK_ID="critical-ledger-1" \
+python scripts/run_benchmark.py \
+  --dataset bench/ablations/tasks.yaml \
+  --live \
+  --out bench/ablations/live_results.json \
+  --transcript-out bench/ablations/codex_agent_transcript.json
+```
+
+适配器通过 stdio MCP 只暴露 `validate_patch`，要求 Codex 原样提交冻结 diff，并解析
+`codex exec --json` 的真实事件。benchmark 会用当前 FastMCP schema 再执行同一调用；只有
+输入、完整输出和最终决策全部一致时才写出 transcript。
 
 ## 诚实声明与限制
 

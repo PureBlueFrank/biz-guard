@@ -5,6 +5,7 @@ from .java_spring import JavaFact, analyze
 
 
 def analyze_persistence(path: Path, repository: str, revision: str) -> list[JavaFact]:
+    """Extract persistence-relevant Java facts from a source file."""
     return [
         fact
         for fact in analyze(path, repository, revision)

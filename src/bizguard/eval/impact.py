@@ -16,6 +16,7 @@ from bizguard.domain.models import Evidence
 
 
 def evaluate(dataset: Path, graph: Path) -> dict[str, object]:
+    """Evaluate impact-analysis output against a golden dataset."""
     tasks = (yaml.safe_load(dataset.read_text(encoding="utf-8")) or {}).get("tasks", [])
     snapshot = GraphSnapshot.from_dict(json.loads(graph.read_text(encoding="utf-8")))
     edge_ids = {edge.id for edge in snapshot.edges}
@@ -67,6 +68,7 @@ def _changed_id_from_diff(dataset: Path, task: dict[str, object], snapshot: Grap
 
 
 def changed_id_from_diff_text(snapshot: GraphSnapshot, text: str, label: str = "diff") -> str:
+    """Resolve the changed graph node from unified diff text."""
     match = re.search(r"^--- a/(.+)$", text, re.MULTILINE)
     if match is None:
         raise ValueError(f"{label}: malformed fixture diff")
@@ -171,6 +173,7 @@ def _matches_expected_nodes(path: Sequence[str], expected: object) -> bool:
 
 
 def main() -> int:
+    """Run impact evaluation from command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--graph", type=Path, required=True)

@@ -14,6 +14,8 @@ from bizguard.semantic.required_tests import select_required_tests
 
 
 class ImpactReport(BaseModel):
+    """The serializable impact-analysis response."""
+
     changed_symbol: str
     revision: str
     layers: dict[str, list[str]]
@@ -26,6 +28,8 @@ class ImpactReport(BaseModel):
 
 
 class ImpactService:
+    """Build impact reports from source graphs and semantic policy metadata."""
+
     def __init__(self, repositories_root: Path, catalog: SemanticCatalog | None = None) -> None:
         self._root = repositories_root
         self._catalog = catalog or load_catalog(Path(__file__).parents[1] / "semantic" / "catalog.yaml")

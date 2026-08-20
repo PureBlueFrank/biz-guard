@@ -11,6 +11,8 @@ from .state_machine import ApprovalState, transition
 
 
 class Waiver(BaseModel):
+    """Describe a time-bounded waiver and its compensating control."""
+
     scope: str
     reason: str
     compensating_control: str
@@ -21,6 +23,8 @@ class Waiver(BaseModel):
 
 
 class ApprovalRequest(BaseModel):
+    """Track approval state, approvers, delegations, and waivers."""
+
     change_context_id: str
     policy_revision: str
     approvers: tuple[str, ...]
@@ -36,6 +40,8 @@ class ApprovalRequest(BaseModel):
 
 
 class ApprovalService:
+    """Manage approval requests and append their audit events."""
+
     def __init__(self, available: bool = True) -> None:
         self.available = available
         self._requests: dict[tuple[str, str, tuple[str, ...]], ApprovalRequest] = {}

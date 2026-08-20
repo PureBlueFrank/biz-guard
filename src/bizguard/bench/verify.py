@@ -18,6 +18,8 @@ from bizguard.graph.ids import api_id, db_id, mq_id, proto_id
 
 
 class ManifestTask(BaseModel):
+    """Define one versioned benchmark task."""
+
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
@@ -32,6 +34,8 @@ class ManifestTask(BaseModel):
 
 
 class Manifest(BaseModel):
+    """Define a versioned benchmark manifest."""
+
     model_config = ConfigDict(extra="forbid")
 
     version: int
@@ -402,6 +406,7 @@ def _resolve_repo_uri(root: Path, uri: str) -> Path:
 
 
 def main() -> None:
+    """Run benchmark verification from command-line arguments."""
     parser = argparse.ArgumentParser(description="Verify BizGuard golden benchmark contracts.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--suite", required=True)

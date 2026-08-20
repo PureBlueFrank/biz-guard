@@ -7,6 +7,8 @@ from bizguard.domain.models import Evidence
 
 
 class ServiceCatalogProvider:
+    """Collect capability evidence from a versioned service catalog."""
+
     def __init__(self, catalog: Path, revision: str) -> None:
         self.catalog = catalog
         self.revision = revision

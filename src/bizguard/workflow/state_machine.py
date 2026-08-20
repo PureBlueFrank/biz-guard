@@ -4,6 +4,8 @@ from enum import StrEnum
 
 
 class ApprovalState(StrEnum):
+    """Enumerate the states in an approval workflow."""
+
     PENDING = "pending"
     EVIDENCE_REQUESTED = "evidence_requested"
     APPROVED = "approved"
@@ -20,6 +22,7 @@ _TRANSITIONS = {
 
 
 def transition(current: ApprovalState, target: ApprovalState) -> ApprovalState:
+    """Validate and return an allowed approval-state transition."""
     if target not in _TRANSITIONS.get(current, set()):
         raise ValueError(f"illegal approval transition: {current} -> {target}")
     return target

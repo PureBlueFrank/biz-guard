@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC
 from hashlib import sha256
 import json
+import math
 from pathlib import Path
 import re
 
@@ -27,6 +28,8 @@ from .staleness import Clock, utc_now
 
 
 class ContextLayer(BaseModel):
+    """Model one ordered layer of a compiled Context Pack."""
+
     name: str
     items: list[dict[str, object]] = Field(default_factory=list)
     evidence_ids: list[str] = Field(default_factory=list)
@@ -61,9 +64,13 @@ class ContextPack(BaseModel):
 
 
 def _tokens(value: object) -> int:
-    """Conservative Unicode token estimate, including serialized evidence."""
+    """Estimate serialized tokens while counting CJK characters individually."""
     text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    return sum(1 if "\u4e00" <= char <= "\u9fff" else max(1, len(char.encode("utf-8")) // 4) for char in text)
+    units = re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9_]+|[^\sA-Za-z0-9_\u4e00-\u9fff]", text)
+    return sum(
+        1 if len(unit) == 1 else math.ceil(len(unit.encode("utf-8")) / 4)
+        for unit in units
+    )
 
 
 def _id(task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str, digest: str) -> str:
@@ -72,6 +79,8 @@ def _id(task: str, repos: list[str], revisions: dict[str, str], principal: str, 
 
 
 class ContextCompiler:
+    """Compile tasks into evidence-preserving Context Packs."""
+
     def __init__(
         self,
         repositories_root: Path,

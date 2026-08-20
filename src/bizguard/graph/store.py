@@ -7,6 +7,8 @@ from .models import GraphSnapshot
 
 
 class GraphStore:
+    """Persist graph snapshots as JSON."""
+
     def __init__(self, path: Path) -> None:
         self.path = path
 

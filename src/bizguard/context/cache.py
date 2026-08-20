@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class CacheKey:
+    """Identify a cached Context Pack across all isolation boundaries."""
+
     task: str
     repos: tuple[str, ...]
     revisions: tuple[tuple[str, str], ...]
@@ -38,12 +40,16 @@ class CacheKey:
 
 @dataclass(frozen=True)
 class CachedContext:
+    """Store a Context Pack with its creation and revision metadata."""
+
     pack: "ContextPack"
     created_at: datetime
     revisions: dict[str, str]
 
 
 class ContextCache:
+    """Cache Context Packs in memory with revision and TTL validation."""
+
     def __init__(self, ttl: timedelta = timedelta(minutes=10), now: Clock = utc_now) -> None:
         self._ttl, self._now = ttl, now
         self._items: dict[str, CachedContext] = {}

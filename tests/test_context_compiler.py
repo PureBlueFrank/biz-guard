@@ -39,17 +39,40 @@ def test_compiler_matches_each_frozen_context_pack(task: dict[str, object]) -> N
     assert _digest(pack.required_tests) == task["required_tests_sha256"]
 
 
-@pytest.mark.parametrize("budget", [2000, 4000])
-def test_budget_preserves_mandatory_evidence_and_truncates_expandable(budget: int) -> None:
+@pytest.mark.parametrize(
+    ("budget", "expandable_truncated"),
+    [(800, True), (1200, True), (2000, True), (4000, False)],
+)
+def test_budget_preserves_mandatory_evidence_and_truncates_expandable(
+    budget: int,
+    expandable_truncated: bool,
+) -> None:
     compiler = ContextCompiler(ROOT / "fixtures/java-microservices")
     revisions = {"coupon-core": "fixture-coupon-core-base", "__index__": "phase3-fixture-v1"}
     pack = compiler.compile("update coupon redemption status", ["coupon-core"], revisions, token_budget=budget)
 
-    assert pack.mandatory_policy_recall == len(pack.mandatory.items) / len(pack.mandatory.items)
+    assert pack.mandatory_policy_recall == 1.0
     assert pack.mandatory.items and pack.mandatory.evidence_ids
     assert pack.mandatory.evidence_ids
-    assert pack.expandable.truncated
+    assert pack.expandable.truncated is expandable_truncated
     assert pack.token_count <= budget
+
+
+def test_budget_rejects_mandatory_context_that_cannot_fit() -> None:
+    mandatory = ContextLayer(
+        name="Mandatory",
+        items=[{"policy_id": "required", "statement": "required rule " * 400}],
+        evidence_ids=["evidence:required"],
+    )
+    structural = ContextLayer(name="Structural")
+    rationale = ContextLayer(name="Rationale")
+    expandable = ContextLayer(name="Expandable")
+
+    with pytest.raises(ValueError, match="mandatory context exceeds token_budget"):
+        ContextCompiler._apply_budget(800, mandatory, structural, rationale, expandable, [])
+
+    assert mandatory.items
+    assert mandatory.evidence_ids == ["evidence:required"]
 
 
 def test_content_digest_changes_context_id_and_marks_bad_digest_stale(tmp_path: Path) -> None:

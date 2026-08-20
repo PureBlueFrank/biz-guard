@@ -8,6 +8,8 @@ from bizguard.graph.runtime import import_trace
 
 
 class RuntimeEvidenceProvider:
+    """Collect runtime trace evidence over a repository graph snapshot."""
+
     def __init__(self, repos: Path, trace: Path, revision: str) -> None:
         self.repos = repos
         self.trace = trace
