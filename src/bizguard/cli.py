@@ -16,7 +16,6 @@ from bizguard.decision import (
 )
 from bizguard.decision.v2 import DecisionResult, DecisionState, decide_diff
 from bizguard.context.compiler import ContextCompiler, ContextPack
-from bizguard.change.store import ChangeContextStore
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.repository import KnowledgeRepository
@@ -58,6 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     knowledge_search.add_argument("--revision", default="semantic-seed-v1")
     knowledge_search.add_argument("--roles", nargs="+", default=["engineering"])
     knowledge_search.add_argument("--json", action="store_true")
+    knowledge_search.add_argument("--require-real-embedding", action="store_true")
     symbol_parser = subparsers.add_parser("symbol")
     symbol_subparsers = symbol_parser.add_subparsers(dest="symbol_command", required=True)
     symbol_explain = symbol_subparsers.add_parser("explain")
@@ -72,7 +72,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     tests_required.add_argument("--json", action="store_true")
     try:
         arguments = parser.parse_args(argv)
-    except SystemExit:
+    except SystemExit as exc:
+        if exc.code == 0:
+            return 0
         _print_card(_invalid_input_card("命令参数无效；请使用 bizguard check --diff FILE。"))
         return 2
     if arguments.command == "prepare":
@@ -155,16 +157,12 @@ def _project_root() -> Path:
 
 def _prepare(arguments: argparse.Namespace) -> int:
     root = _project_root()
-    store = ChangeContextStore(root / ".artifacts" / "change-context.sqlite3")
-    try:
-        compiler = ContextCompiler(root / "fixtures/java-microservices", store=store)
-        pack = compiler.compile(
-            arguments.task, arguments.repos, arguments.base_revisions, arguments.principal, arguments.token_budget
-        )
-        print(pack.model_dump_json())
-        return 0
-    finally:
-        store.close()
+    compiler = ContextCompiler(root / "fixtures/java-microservices")
+    pack = compiler.compile(
+        arguments.task, arguments.repos, arguments.base_revisions, arguments.principal, arguments.token_budget
+    )
+    print(pack.model_dump_json())
+    return 0
 
 
 def _context_impact(arguments: argparse.Namespace) -> int:
@@ -181,8 +179,13 @@ def _knowledge_search(arguments: argparse.Namespace) -> int:
         result = HybridSearch(repository, LocalVectorAdapter()).search(
             SearchRequest(query=arguments.query, scope=arguments.scope, revision=arguments.revision, caller_roles=arguments.roles)
         )
-        print(result.model_dump_json())
-        return 0
+        payload = result.model_dump(mode="json")
+        if result.semantic_channel.startswith("DEGRADED:"):
+            payload["retrieval_quality_notice"] = (
+                "离线词法向量降级：结果不等同于真实 embedding；CI/生产必须配置真实 embedding。"
+            )
+        print(json.dumps(payload, ensure_ascii=False))
+        return 1 if arguments.require_real_embedding and result.semantic_channel.startswith("DEGRADED:") else 0
     finally:
         repository.close()
 

@@ -80,12 +80,16 @@ class ContextCompiler:
         cache: ContextCache | None = None,
         store: ChangeContextStore | None = None,
         now: Clock = utc_now,
+        reuse_index: bool = False,
     ) -> None:
         self._repositories_root = repositories_root
         root = Path(__file__).parents[3]
         self._knowledge_root = knowledge_root or root / "knowledge" / "published"
         self._catalog = load_catalog(catalog_path or root / "src/bizguard/semantic/catalog.yaml")
         self._cache, self._store, self._now = cache or ContextCache(now=now), store, now
+        self._reuse_index = reuse_index
+        self._graphs: dict[str, GraphSnapshot] = {}
+        self._knowledge_repository: KnowledgeRepository | None = None
 
     def compile(
         self,
@@ -102,7 +106,7 @@ class ContextCompiler:
             raise ValueError("task and repos are required")
         revisions = self._revisions(base_revisions, repos)
         revision = self._index_revision(revisions)
-        graph = index(self._repositories_root, revision)
+        graph = self._graph(revision)
         cache_revisions = revisions | {"__graph_content_digest__": graph.content_digest}
         key = CacheKey.create(task, repos, cache_revisions, principal, index_version, token_budget)
         cached = self._cache.get(key, cache_revisions)
@@ -133,7 +137,7 @@ class ContextCompiler:
         ]
         expandable_items.append({"semantic_channel": search.semantic_channel})
         expandable = ContextLayer(name="Expandable", items=expandable_items)
-        self._apply_budget(token_budget, mandatory, structural, rationale, expandable)
+        self._apply_budget(token_budget, mandatory, structural, rationale, expandable, evidence)
         context_id = _id(task, repos, revisions, principal, index_version, graph.content_digest)
         retained_policy_ids = {str(item["policy_id"]) for item in mandatory.items}
         policy_recall = len(retained_policy_ids) / len(policies) if policies else 1.0
@@ -214,6 +218,13 @@ class ContextCompiler:
         return selected.id, capability.id
 
     def _search(self, task: str, principal: str, capability: str) -> SearchResult:
+        if self._reuse_index:
+            if self._knowledge_repository is None:
+                self._knowledge_repository = KnowledgeRepository.memory()
+                ingest_directory(self._knowledge_root, self._knowledge_repository)
+            return HybridSearch(self._knowledge_repository, LocalVectorAdapter(), self._catalog).search(
+                SearchRequest(query=task, caller_roles=[principal], scope=capability, revision=self._catalog.revision)
+            )
         repository = KnowledgeRepository.memory()
         try:
             ingest_directory(self._knowledge_root, repository)
@@ -223,20 +234,52 @@ class ContextCompiler:
         finally:
             repository.close()
 
+    def _graph(self, revision: str) -> GraphSnapshot:
+        if not self._reuse_index:
+            return index(self._repositories_root, revision)
+        graph = self._graphs.get(revision)
+        if graph is None:
+            graph = index(self._repositories_root, revision)
+            self._graphs[revision] = graph
+        return graph
+
     @staticmethod
-    def _apply_budget(budget: int, mandatory: ContextLayer, *optional: ContextLayer) -> None:
-        """Drop whole optional items only; Mandatory and all evidence IDs remain intact."""
-        used = _tokens(mandatory.items) + _tokens(mandatory.evidence_ids)
-        for layer in optional:
-            retained: list[dict[str, object]] = []
-            for item in layer.items:
-                cost = _tokens(item)
-                if used + cost <= budget:
-                    retained.append(item)
-                    used += cost
-                else:
-                    layer.truncated = True
-            layer.items = retained
+    def _apply_budget(
+        budget: int,
+        mandatory: ContextLayer,
+        structural: ContextLayer,
+        rationale: ContextLayer,
+        expandable: ContextLayer,
+        evidence: list[dict[str, object]],
+    ) -> None:
+        """Trim least important layers until their serialized payload fits the budget.
+
+        Mandatory policy and evidence references are intentionally never removed. The
+        Expandable and rationale are trimmed first.  Detailed evidence and structural
+        items are optional renderings; their immutable IDs stay in Mandatory even
+        when their verbose copies must be omitted at smaller budgets.
+        """
+        def payload_tokens() -> int:
+            return _tokens(
+                {
+                    "mandatory": mandatory.model_dump(),
+                    "structural": structural.model_dump(),
+                    "rationale": rationale.model_dump(),
+                    "expandable": expandable.model_dump(), "evidence": evidence,
+                }
+            )
+
+        for layer in (expandable, rationale):
+            while layer.items and payload_tokens() > budget:
+                layer.items.pop()
+                layer.truncated = True
+        while evidence and payload_tokens() > budget:
+            evidence.pop()
+        while structural.items and payload_tokens() > budget:
+            structural.items.pop()
+            structural.truncated = True
+        if payload_tokens() > budget:
+            raise ValueError("mandatory context exceeds token_budget")
 
 
 def compile_context(

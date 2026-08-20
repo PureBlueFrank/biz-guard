@@ -11,6 +11,8 @@ import yaml  # type: ignore[import-untyped]
 
 from bizguard.decision.v2 import DecisionInput, FindingV2, decide
 from bizguard.policy.validators import validate_artifact
+from bizguard.semantic.models import load_catalog
+from bizguard.semantic.required_tests import select_required_tests
 
 
 def evaluate(diff_text: str, base_revisions: dict[str, object] | None = None) -> dict[str, object]:
@@ -31,16 +33,35 @@ def evaluate(diff_text: str, base_revisions: dict[str, object] | None = None) ->
     public_change = Path(path).suffix in {".proto", ".yaml", ".yml", ".json"} or any(
         token in added.lower() for token in ("openapi", "message ", "dto", "enum ", "record ")
     )
+    required_tests = _required_tests(public_change)
     finding = FindingV2(
         id=f"{artifact['id']}:{revision_hash[:12]}", severity=str(artifact["severity"]), effect=str(artifact["effect"]),
         remediation=str(artifact["remediation"]), confidence=float(confidence),
         violated=bool(artifact["violated"]), public_contract=public_change, required_approver="coupon_platform",
     )
-    result = decide(DecisionInput(findings=[finding], tests_passed=True, owners=["coupon_platform"]))
+    result = decide(
+        DecisionInput(
+            findings=[finding],
+            required_tests=[str(item["id"]) for item in required_tests],
+            tests_passed=True,
+            owners=["coupon_platform"],
+        )
+    )
     payload = result.model_dump(mode="json")
+    payload["required_tests"] = required_tests
     payload["audit_event_id"] = "ci-recomputed"
     payload["base_revisions_sha256"] = revision_hash
     return payload
+
+
+def _required_tests(public_change: bool) -> list[dict[str, object]]:
+    if not public_change:
+        return []
+    catalog = load_catalog(Path(__file__).parents[1] / "semantic" / "catalog.yaml")
+    return [
+        item.model_dump()
+        for item in select_required_tests(catalog, "dto_field_contract", "coupon-dto-field-compatibility")
+    ]
 
 
 def main() -> int:

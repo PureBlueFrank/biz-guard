@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 
+import scripts.run_benchmark as benchmark
 import yaml  # type: ignore[import-untyped]
+from pytest import MonkeyPatch
+
+from bizguard.context.compiler import ContextCompiler
 
 from scripts.run_benchmark import BASELINES, TRANSCRIPT, _predict, run
 
@@ -19,6 +23,19 @@ def test_all_baselines_execute_real_fixtures_and_measure_distinct_results() -> N
         {row["impact_recall"] for row in output["baselines"]}
     ) > 1
     assert output["baselines"][-1]["tasks"][0]["prediction"] == "block"
+
+
+def test_run_reuses_one_context_compiler_for_all_five_baselines(monkeypatch: MonkeyPatch) -> None:
+    created = 0
+
+    def create(repositories_root: Path, *, reuse_index: bool = False) -> ContextCompiler:
+        nonlocal created
+        created += 1
+        return ContextCompiler(repositories_root, reuse_index=reuse_index)
+
+    monkeypatch.setattr("scripts.run_benchmark.ContextCompiler", create)
+    benchmark.run(DATASET, offline=True)
+    assert created == 1
 
 
 def test_every_task_references_a_readable_real_diff_fixture() -> None:

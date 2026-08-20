@@ -7,7 +7,6 @@ from pytest import CaptureFixture
 
 from bizguard.cli import main
 from bizguard.context.compiler import ContextCompiler
-from bizguard.change.store import ChangeContextStore
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.repository import KnowledgeRepository
@@ -26,11 +25,6 @@ def test_prepare_cli_delegates_to_context_compiler(capsys: CaptureFixture[str]) 
     output = json.loads(capsys.readouterr().out)
     expected = ContextCompiler(ROOT / "fixtures/java-microservices").compile("status", ["coupon-core"], REVISIONS).model_dump(mode="json")
     assert output == expected
-    store = ChangeContextStore(ROOT / ".artifacts" / "change-context.sqlite3")
-    try:
-        assert store.get(output["change_context_id"]) == json.dumps(output, ensure_ascii=False, separators=(",", ":"))
-    finally:
-        store.close()
 
 
 def test_impact_context_cli_outputs_pack_impact(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
@@ -52,7 +46,21 @@ def test_knowledge_search_cli_delegates_to_core(capsys: CaptureFixture[str]) -> 
         ).model_dump(mode="json")
     finally:
         repository.close()
-    assert output == expected
+    assert output == expected | {
+        "retrieval_quality_notice": "离线词法向量降级：结果不等同于真实 embedding；CI/生产必须配置真实 embedding。"
+    }
+
+
+def test_prepare_help_returns_zero_without_check_incomplete(capsys: CaptureFixture[str]) -> None:
+    assert main(["prepare", "--help"]) == 0
+    output = capsys.readouterr().out
+    assert "--token-budget" in output
+    assert "CHECK_INCOMPLETE" not in output
+
+
+def test_production_knowledge_mode_rejects_degraded_embedding(capsys: CaptureFixture[str]) -> None:
+    assert main(["knowledge", "search", "--query", "status", "--require-real-embedding"]) == 1
+    assert "retrieval_quality_notice" in capsys.readouterr().out
 
 
 def test_symbol_explain_cli_delegates_to_core(capsys: CaptureFixture[str]) -> None:

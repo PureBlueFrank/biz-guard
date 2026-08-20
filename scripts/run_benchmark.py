@@ -88,21 +88,26 @@ def _rag(diff_text: str) -> str:
     return "allow"
 
 
-def _context(task: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def _context(
+    task: dict[str, Any], compiler: ContextCompiler | None = None, cache: dict[str, dict[str, Any]] | None = None
+) -> tuple[str, dict[str, Any]]:
     """Compile an actual Context Pack and decide only from its emitted evidence."""
     repositories = task.get("repositories", ["coupon-core"])
     revisions = task.get("base_revisions", {"coupon-core": "benchmark-base"})
     if not isinstance(repositories, list) or not isinstance(revisions, dict):
         raise ValueError(f"task {task.get('id')} has invalid Context inputs")
-    pack = ContextCompiler(ROOT / "fixtures" / "java-microservices").compile(
-        str(task["prompt"]),
-        [str(item) for item in repositories],
-        {str(key): str(value) for key, value in revisions.items()},
-    )
-    pack_data = pack.model_dump(mode="json")
-    if pack.unknowns or pack.required_approvers:
+    key = json.dumps({"prompt": task["prompt"], "repositories": repositories, "revisions": revisions}, sort_keys=True)
+    pack_data = cache.get(key) if cache is not None else None
+    if pack_data is None:
+        pack = (compiler or ContextCompiler(ROOT / "fixtures" / "java-microservices")).compile(
+            str(task["prompt"]), [str(item) for item in repositories], {str(key): str(value) for key, value in revisions.items()}
+        )
+        pack_data = pack.model_dump(mode="json")
+        if cache is not None:
+            cache[key] = pack_data
+    if pack_data["unknowns"] or pack_data["required_approvers"]:
         return "approval", pack_data
-    if pack.required_tests:
+    if pack_data["required_tests"]:
         return "tests", pack_data
     return "allow", pack_data
 
@@ -124,10 +129,12 @@ def _naive_baseline(diff_text: str) -> str:
     return "allow"
 
 
-def _full(task: dict[str, Any], diff_text: str) -> str:
+def _full(
+    task: dict[str, Any], diff_text: str, compiler: ContextCompiler | None = None, cache: dict[str, dict[str, Any]] | None = None
+) -> str:
     """Run policy validators then feed their real result into Decision v2."""
     policy = evaluate_change(diff_text)
-    _, pack = _context(task)
+    _, pack = _context(task, compiler, cache)
     violated = policy.decision is Decision.BLOCK
     unknown = policy.decision is Decision.CHECK_INCOMPLETE
     finding = FindingV2(
@@ -152,7 +159,9 @@ def _full(task: dict[str, Any], diff_text: str) -> str:
     return _OUTCOMES[result.decision]
 
 
-def _predict(task: dict[str, Any], baseline: str, dataset: Path) -> str:
+def _predict(
+    task: dict[str, Any], baseline: str, dataset: Path, compiler: ContextCompiler | None = None, cache: dict[str, dict[str, Any]] | None = None
+) -> str:
     """Dispatch to the component named by the ablation; labels are never consulted."""
     _, diff_text = _read_diff(task, dataset)
     if baseline == "Rules Only":
@@ -160,18 +169,20 @@ def _predict(task: dict[str, Any], baseline: str, dataset: Path) -> str:
     if baseline == "RAG Only":
         return _rag(diff_text)
     if baseline == "Context":
-        return _context(task)[0]
+        return _context(task, compiler, cache)[0]
     if baseline == "Naive Baseline":
         return _naive_baseline(diff_text)
     if baseline == "Full":
-        return _full(task, diff_text)
+        return _full(task, diff_text, compiler, cache)
     raise ValueError(f"unknown baseline: {baseline}")
 
 
-def _measure(tasks: list[dict[str, Any]], baseline: str, dataset: Path) -> dict[str, Any]:
+def _measure(
+    tasks: list[dict[str, Any]], baseline: str, dataset: Path, compiler: ContextCompiler, cache: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     started = time.perf_counter()
     rows = [
-        {"task_id": task["id"], "prediction": _predict(task, baseline, dataset), "truth": task["truth"]}
+        {"task_id": task["id"], "prediction": _predict(task, baseline, dataset, compiler, cache), "truth": task["truth"]}
         for task in tasks
     ]
     critical = [row for row in rows if row["truth"] == "block"]
@@ -252,10 +263,11 @@ def run(dataset: Path, offline: bool) -> dict[str, Any]:
         _read_diff(task, dataset)
     revision = raw.get("version")
     trajectory = _offline_transcript(tasks, dataset, revision) if offline else _live_transcript(tasks, dataset, revision)
+    compiler = ContextCompiler(ROOT / "fixtures" / "java-microservices", reuse_index=True)
     return {
         "dataset_revision": revision,
         "offline_notice": "Naive Baseline is a heuristic, not a real agent.",
-        "baselines": [_measure(tasks, baseline, dataset) for baseline in BASELINES],
+        "baselines": [_measure(tasks, baseline, dataset, compiler, {}) for baseline in BASELINES],
         "agent_trajectory": trajectory,
     }
 
