@@ -1,0 +1,19 @@
+{
+  "agent": "offline-baseline-agent",
+  "model": "recorded-local-agent-v1",
+  "prompt": "check redemption idempotency",
+  "bizguard_version": "0.1.0",
+  "revision": "phase5-v2",
+  "task_id": "critical-ledger-1",
+  "decision": "block",
+  "duration_ms": 3.4,
+  "diff_sha256": "931e439b072bc4ae2cb8ef3f52020e53a6cb2ff02da7bfe14607718b13bbcf6b",
+  "tool_calls": [
+    {
+      "tool": "bizguard.validate_patch",
+      "input": {"fixture": "sample/diffs/diff_violation_1.diff"},
+      "output": {"decision": "BLOCK", "finding_status": "violated"},
+      "duration_ms": 3.4
+    }
+  ]
+}
