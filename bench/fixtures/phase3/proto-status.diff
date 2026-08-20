@@ -1,0 +1,6 @@
+diff --git a/fixtures/java-microservices/coupon-contract/src/main/resources/coupon.proto b/fixtures/java-microservices/coupon-contract/src/main/resources/coupon.proto
+--- a/fixtures/java-microservices/coupon-contract/src/main/resources/coupon.proto
++++ b/fixtures/java-microservices/coupon-contract/src/main/resources/coupon.proto
+@@ -3,3 +3,3 @@
+-message RedeemResponse { string redemption_id = 1; string status = 2; }
++message RedeemResponse { string redemption_id = 1; string status = 3; }

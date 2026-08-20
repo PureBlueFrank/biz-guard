@@ -1,11 +1,20 @@
 """Command-line adapter for BizGuard's shared decision function."""
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from bizguard.decision import ChangeSafetyCard, Decision, Fault, FaultCode, Finding, FindingStatus, evaluate_change
+from bizguard.decision import (
+    ChangeSafetyCard,
+    Decision,
+    Fault,
+    FaultCode,
+    Finding,
+    FindingStatus,
+    evaluate_change,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -14,11 +23,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     check_parser = subparsers.add_parser("check")
     check_parser.add_argument("--diff", type=Path, required=True)
+    impact_parser = subparsers.add_parser("impact")
+    impact_subparsers = impact_parser.add_subparsers(dest="impact_command", required=True)
+    analyze_parser = impact_subparsers.add_parser("analyze")
+    analyze_parser.add_argument("--diff", type=Path, required=True)
+    analyze_parser.add_argument("--repos", type=Path, required=True)
+    analyze_parser.add_argument("--revision-set", type=Path, required=True)
+    analyze_parser.add_argument("--format", choices=["json"], default="json")
     try:
         arguments = parser.parse_args(argv)
     except SystemExit:
         _print_card(_invalid_input_card("命令参数无效；请使用 bizguard check --diff FILE。"))
         return 2
+    if arguments.command == "impact":
+        return _impact(arguments)
     diff_path = arguments.diff
     if not diff_path.is_file() or not diff_path.stat().st_mode:
         print("--diff must identify an existing readable unified diff file", file=sys.stderr)
@@ -34,6 +52,35 @@ def main(argv: Sequence[str] | None = None) -> int:
     card = evaluate_change(diff_text)
     _print_card(card)
     return _exit_code(card)
+
+
+def _impact(arguments: argparse.Namespace) -> int:
+    """Build a pinned fixture snapshot and report conservative impact JSON."""
+    import yaml  # type: ignore[import-untyped]
+    from bizguard.graph.indexer import index
+    from bizguard.impact.analyzer import analyze
+
+    raw = yaml.safe_load(arguments.revision_set.read_text(encoding="utf-8")) or {}
+    revision = str(raw.get("revision", "phase3-fixture-v1"))
+    diff_text = arguments.diff.read_text(encoding="utf-8")
+    changed = (
+        "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status"
+        if "status" in diff_text
+        else "UNKNOWN_BOUNDARY"
+    )
+    result = analyze(index(arguments.repos, revision), changed, revision)
+    print(
+        json.dumps(
+            {
+                "layers": result.layers,
+                "path": result.path,
+                "unknown_boundary": result.unknown_boundary,
+                "evidence": [item.model_dump() for item in result.evidence],
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
 
 
 def _invalid_input_card(message: str, refs: list[str] | None = None) -> ChangeSafetyCard:

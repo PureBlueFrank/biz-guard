@@ -1,0 +1,6 @@
+diff --git a/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java b/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java
+--- a/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java
++++ b/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java
+@@ -5,1 +5,1 @@
+-    CouponRedemptionDto redeem(String couponCode, String idempotencyKey);
++    CouponRedemptionDto redeemV2(String couponCode, String idempotencyKey);

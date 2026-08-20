@@ -1,0 +1,8 @@
+diff --git a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java
+--- a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java
++++ b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java
+@@ -1,3 +1,3 @@
+ package com.bizguard.coupon.api;
+ 
+-public record CouponResponse(String redemptionId, String status) {}
++public record CouponResponse(String redemptionId, String redemptionStatus) {}

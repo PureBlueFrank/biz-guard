@@ -1,0 +1,6 @@
+diff --git a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java
+--- a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java
++++ b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java
+@@ -10,1 +10,1 @@
+-    @PostMapping("/v1/coupons/redeem")
++    @PostMapping("/v2/coupons/redeem")

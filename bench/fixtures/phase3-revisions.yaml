@@ -1,0 +1,5 @@
+revision: phase3-fixture-v1
+repositories:
+  coupon-core: fixture-coupon-core-base
+  coupon-contract: fixture-coupon-contract-base
+  merchant-service: fixture-merchant-service-base

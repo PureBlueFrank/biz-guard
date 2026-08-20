@@ -1,0 +1,1 @@
+{"revision":"phase3-fixture-v1","calls":[{"id":"call-1","source_id":"service://merchant-service","target_id":"service://coupon-core","confidence":0.95,"first_seen":"2026-01-01T00:00:00Z","last_seen":"2026-01-02T00:00:00Z"}]}

@@ -1,0 +1,6 @@
+diff --git a/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java b/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java
+--- a/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java
++++ b/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java
+@@ -5,3 +5,3 @@
+-    public void onCouponRedeemed(String status) {
++    public void onCouponRedeemed(String redemptionStatus) {

@@ -1,0 +1,1 @@
+{"revision":"phase3-fixture-v1","calls":[{"id":"call-2","source_id":"service://external-gateway","target_id":"service://merchant-service","confidence":0.7,"first_seen":"2026-01-03T00:00:00Z","last_seen":"2026-01-03T00:00:00Z"}]}

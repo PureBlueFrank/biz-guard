@@ -1,0 +1,6 @@
+diff --git a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java
+--- a/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java
++++ b/fixtures/java-microservices/coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java
+@@ -8,1 +8,1 @@
+-    private final String status;
++    private final String redemptionStatus;

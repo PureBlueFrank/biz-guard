@@ -1,0 +1,7 @@
+diff --git a/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java b/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java
+--- a/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java
++++ b/fixtures/java-microservices/merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java
+@@ -1,4 +1,4 @@
+ package com.bizguard.merchant.api;
+-public record CouponRedemptionDto(String redemptionId, String status) {}
++public record CouponRedemptionDto(String redemptionId, String redemptionStatus) {}
