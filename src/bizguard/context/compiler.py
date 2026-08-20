@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from bizguard.change.store import ChangeContextStore
 from bizguard.impact.service import ImpactReport, ImpactService
 from bizguard.graph.indexer import index
+from bizguard.graph.models import GraphSnapshot
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.models import SearchResult
@@ -39,6 +40,8 @@ class ContextPack(BaseModel):
     task: str
     repositories: list[str]
     base_revisions: dict[str, str]
+    index_revision: str
+    graph_content_digest: str
     index_version: str
     principal: str
     token_budget: int
@@ -51,18 +54,20 @@ class ContextPack(BaseModel):
     expandable: ContextLayer
     candidates: list[str]
     impact: ImpactReport
-    required_tests: list[dict[str, str]]
+    required_tests: list[dict[str, object]]
     required_approvers: list[str]
     unknowns: list[str]
     evidence: list[dict[str, object]]
 
 
 def _tokens(value: object) -> int:
-    return len(re.findall(r"\w+", json.dumps(value, ensure_ascii=False)))
+    """Conservative Unicode token estimate, including serialized evidence."""
+    text = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return sum(1 if "\u4e00" <= char <= "\u9fff" else max(1, len(char.encode("utf-8")) // 4) for char in text)
 
 
-def _id(task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str) -> str:
-    payload = {"task": task, "repos": sorted(repos), "revisions": revisions, "principal": principal, "index": index_version}
+def _id(task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str, digest: str) -> str:
+    payload = {"task": task, "repos": sorted(repos), "revisions": revisions, "principal": principal, "index": index_version, "graph_content_digest": digest}
     return "ctx-" + sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:20]
 
 
@@ -96,14 +101,16 @@ class ContextCompiler:
         if not task.strip() or not repos:
             raise ValueError("task and repos are required")
         revisions = self._revisions(base_revisions, repos)
-        key = CacheKey.create(task, repos, revisions, principal, index_version)
-        cached = self._cache.get(key, revisions)
-        if cached is not None and cached.token_budget == token_budget:
-            return cached
         revision = self._index_revision(revisions)
-        symbol, capability = self._candidate(task, repos, revision)
+        graph = index(self._repositories_root, revision)
+        cache_revisions = revisions | {"__graph_content_digest__": graph.content_digest}
+        key = CacheKey.create(task, repos, cache_revisions, principal, index_version, token_budget)
+        cached = self._cache.get(key, cache_revisions)
+        if cached is not None:
+            return cached
+        symbol, capability = self._candidate(task, repos, graph)
         impact = ImpactService(self._repositories_root, self._catalog).analyze(symbol, revision, capability)
-        search = self._search(task, principal)
+        search = self._search(task, principal, capability)
         policies = [item for item in self._catalog.policies if item.capability == capability]
         mandatory_items: list[dict[str, object]] = [
             {"policy_id": item.id, "severity": item.severity, "invariant": item.invariant,
@@ -127,17 +134,25 @@ class ContextCompiler:
         expandable_items.append({"semantic_channel": search.semantic_channel})
         expandable = ContextLayer(name="Expandable", items=expandable_items)
         self._apply_budget(token_budget, mandatory, structural, rationale, expandable)
-        context_id = _id(task, repos, revisions, principal, index_version)
+        context_id = _id(task, repos, revisions, principal, index_version, graph.content_digest)
+        retained_policy_ids = {str(item["policy_id"]) for item in mandatory.items}
+        policy_recall = len(retained_policy_ids) / len(policies) if policies else 1.0
+        requested_digest = revision.removeprefix("sha256:") if revision.startswith("sha256:") else None
         pack = ContextPack(
-            change_context_id=context_id, task=task, repositories=sorted(repos), base_revisions=revisions,
+            change_context_id=context_id, task=task, repositories=sorted(repos),
+            base_revisions={key: value for key, value in revisions.items() if key != "__index__"},
+            index_revision=revision, graph_content_digest=graph.content_digest,
             index_version=index_version, principal=principal, token_budget=token_budget,
-            token_count=sum(_tokens(layer.items) + _tokens(layer.evidence_ids) for layer in (mandatory, structural, rationale, expandable)),
-            mandatory_policy_recall=1.0, mandatory=mandatory, structural=structural, rationale=rationale,
+            token_count=_tokens({"mandatory": mandatory.model_dump(), "structural": structural.model_dump(), "rationale": rationale.model_dump(), "expandable": expandable.model_dump(), "evidence": evidence}),
+            mandatory_policy_recall=policy_recall,
+            stale=requested_digest is not None and requested_digest != graph.content_digest,
+            mandatory=mandatory, structural=structural, rationale=rationale,
             expandable=expandable, candidates=[symbol], impact=impact, required_tests=impact.required_tests,
             required_approvers=impact.required_approvers,
-            unknowns=[impact.unknown_reason] if impact.unknown_reason else [], evidence=evidence,
+            unknowns=( ["NO_MATCHING_SYMBOL"] if symbol.startswith("unknown://task/") else [] )
+            + ([impact.unknown_reason] if impact.unknown_reason else []), evidence=evidence,
         )
-        self._cache.put(key, pack, revisions)
+        self._cache.put(key, pack, cache_revisions)
         if self._store:
             self._store.put(context_id, pack.model_dump_json(), self._now().astimezone(UTC).isoformat())
         return pack
@@ -163,8 +178,13 @@ class ContextCompiler:
     def _index_revision(revisions: dict[str, str]) -> str:
         return revisions.get("__index__") or sha256(json.dumps(revisions, sort_keys=True).encode()).hexdigest()[:16]
 
-    def _candidate(self, task: str, repos: list[str], revision: str) -> tuple[str, str]:
-        graph = index(self._repositories_root, revision)
+    def _candidate(self, task: str, repos: list[str], graph: GraphSnapshot) -> tuple[str, str]:
+        """Select by lexical graph evidence; private-method intent is not source-visibility aware yet.
+
+        P4 has no Java visibility facts, so tasks such as ``rename private redeem helper``
+        may legitimately resolve to the highest lexical graph node rather than a private
+        method.  P5 must add visibility facts before this can be made semantic.
+        """
         terms = set(re.findall(r"[\w-]+", task.lower()))
         candidates = [node for node in graph.nodes if any(repo in node.id for repo in repos)]
         if not candidates:
@@ -189,14 +209,16 @@ class ContextCompiler:
                 item.id,
             ),
         )
+        if not any(term in f"{selected.id} {selected.label}".lower() for term in terms):
+            return f"unknown://task/{sha256(task.encode()).hexdigest()[:16]}", capability.id
         return selected.id, capability.id
 
-    def _search(self, task: str, principal: str) -> SearchResult:
+    def _search(self, task: str, principal: str, capability: str) -> SearchResult:
         repository = KnowledgeRepository.memory()
         try:
             ingest_directory(self._knowledge_root, repository)
             return HybridSearch(repository, LocalVectorAdapter(), self._catalog).search(
-                SearchRequest(query=task, caller_roles=[principal], scope="coupon_redemption", revision=self._catalog.revision)
+                SearchRequest(query=task, caller_roles=[principal], scope=capability, revision=self._catalog.revision)
             )
         finally:
             repository.close()

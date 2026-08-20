@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from hashlib import sha256
 
 import yaml  # type: ignore[import-untyped]
 
@@ -67,7 +68,21 @@ def index(repos: Path, revision: str) -> GraphSnapshot:
     _add_call_edges(facts, edge)
     _add_manual_edges(repos / "bizguard-manual-edges.yaml", nodes, node, edge)
     _add_business_nodes(nodes, node, edge)
-    return GraphSnapshot(revision, _metadata(), list(nodes.values()), edges)
+    digest = _content_digest(repos)
+    return GraphSnapshot(revision, _metadata() | {"content_digest": digest}, digest, list(nodes.values()), edges)
+
+
+def _content_digest(repos: Path) -> str:
+    """Hash the complete indexed source tree, not the caller-supplied revision label."""
+    digest = sha256()
+    for path in sorted(item for item in repos.rglob("*") if item.is_file()):
+        relative = path.relative_to(repos).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        content = path.read_bytes()
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
 
 
 def _add_persistence_edges(

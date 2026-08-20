@@ -16,6 +16,7 @@ from bizguard.decision import (
     evaluate_change,
 )
 from bizguard.context.compiler import ContextCompiler, ContextPack
+from bizguard.change.store import ChangeContextStore
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.repository import KnowledgeRepository
@@ -137,12 +138,16 @@ def _project_root() -> Path:
 
 def _prepare(arguments: argparse.Namespace) -> int:
     root = _project_root()
-    compiler = ContextCompiler(root / "fixtures/java-microservices")
-    pack = compiler.compile(
-        arguments.task, arguments.repos, arguments.base_revisions, arguments.principal, arguments.token_budget
-    )
-    print(pack.model_dump_json())
-    return 0
+    store = ChangeContextStore(root / ".artifacts" / "change-context.sqlite3")
+    try:
+        compiler = ContextCompiler(root / "fixtures/java-microservices", store=store)
+        pack = compiler.compile(
+            arguments.task, arguments.repos, arguments.base_revisions, arguments.principal, arguments.token_budget
+        )
+        print(pack.model_dump_json())
+        return 0
+    finally:
+        store.close()
 
 
 def _context_impact(arguments: argparse.Namespace) -> int:

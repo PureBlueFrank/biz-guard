@@ -45,12 +45,50 @@ def test_budget_preserves_mandatory_evidence_and_truncates_expandable(budget: in
     revisions = {"coupon-core": "fixture-coupon-core-base", "__index__": "phase3-fixture-v1"}
     pack = compiler.compile("update coupon redemption status", ["coupon-core"], revisions, token_budget=budget)
 
-    assert pack.mandatory_policy_recall == 1.0
+    assert pack.mandatory_policy_recall == len(pack.mandatory.items) / len(pack.mandatory.items)
     assert pack.mandatory.items and pack.mandatory.evidence_ids
     assert all(item["id"] in pack.mandatory.evidence_ids for item in pack.evidence)
-    expandable = ContextLayer(name="Expandable", items=[{"trace": "evidence " * budget}])
-    ContextCompiler._apply_budget(budget, pack.mandatory, expandable)
-    assert expandable.truncated
+    assert pack.expandable.truncated
+    assert pack.token_count >= budget
+
+
+def test_content_digest_changes_context_id_and_marks_bad_digest_stale(tmp_path: Path) -> None:
+    fixtures = tmp_path / "fixtures"
+    shutil.copytree(ROOT / "fixtures/java-microservices", fixtures)
+    revisions = {"coupon-core": "fixture-coupon-core-base", "__index__": "sha256:" + "0" * 64}
+    compiler = ContextCompiler(fixtures)
+    before = compiler.compile("update coupon redemption status", ["coupon-core"], revisions)
+    source = fixtures / "coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java"
+    source.write_text(source.read_text(encoding="utf-8") + "\n// changed content\n", encoding="utf-8")
+    after = compiler.compile("update coupon redemption status", ["coupon-core"], revisions)
+
+    assert before.stale and after.stale
+    assert before.graph_content_digest != after.graph_content_digest
+    assert before.change_context_id != after.change_context_id
+
+
+def test_mandatory_policy_recall_is_measured_after_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    def lose_mandatory(_: int, mandatory: ContextLayer, *optional: ContextLayer) -> None:
+        mandatory.items = []
+
+    monkeypatch.setattr(ContextCompiler, "_apply_budget", staticmethod(lose_mandatory))
+    pack = ContextCompiler(ROOT / "fixtures/java-microservices").compile(
+        "update coupon redemption status", ["coupon-core"], {"coupon-core": "fixture-coupon-core-base"}
+    )
+    assert pack.mandatory_policy_recall == 0.0
+
+
+def test_unrelated_task_is_explicitly_reported_unknown() -> None:
+    compiler = ContextCompiler(ROOT / "fixtures/java-microservices")
+    pack = compiler.compile("rotate zebrafish telescope", ["coupon-core"], {"coupon-core": "fixture-coupon-core-base"})
+    assert "NO_MATCHING_SYMBOL" in pack.unknowns
+
+
+def test_private_method_request_keeps_documented_lexical_candidate_limit() -> None:
+    pack = ContextCompiler(ROOT / "fixtures/java-microservices").compile(
+        "rename private redeem helper", ["coupon-core"], {"coupon-core": "fixture-coupon-core-base"}
+    )
+    assert pack.candidates == ["mq://coupon-core/coupon.redeemed#status"]
 
 
 def test_mutating_a_frozen_context_golden_makes_verifier_fail(tmp_path: Path) -> None:

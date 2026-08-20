@@ -72,7 +72,9 @@ def test_cli_and_mcp_return_the_same_card() -> None:
     mcp_result = _call_tool("prepare_change", {"diff_text": diff_path.read_text(encoding="utf-8")})
 
     assert cli.returncode == 1
-    assert json.loads(cli.stdout) == _structured_card(mcp_result)
+    response = _structured_card(mcp_result)
+    assert response["legacy"] is True
+    assert json.loads(cli.stdout) == response["result"]
 
 
 def test_mcp_rejects_non_string_diff_text() -> None:

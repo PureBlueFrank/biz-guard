@@ -72,6 +72,7 @@ class GraphEdge:
 class GraphSnapshot:
     revision: str
     metadata: dict[str, str]
+    content_digest: str = ""
     nodes: list[GraphNode] = field(default_factory=list)
     edges: list[GraphEdge] = field(default_factory=list)
 
@@ -79,6 +80,7 @@ class GraphSnapshot:
         return {
             "revision": self.revision,
             "metadata": self.metadata,
+            "content_digest": self.content_digest,
             "nodes": [asdict(item) | {"kind": item.kind.value} for item in self.nodes],
             "edges": [asdict(item) | {"kind": item.kind.value} for item in self.edges],
         }
@@ -91,6 +93,7 @@ class GraphSnapshot:
         return cls(
             str(raw["revision"]),
             metadata,
+            str(raw.get("content_digest", "")),
             [GraphNode(**(item | {"kind": NodeKind(item["kind"])})) for item in raw_nodes],
             [GraphEdge(**(item | {"kind": EdgeKind(item["kind"])})) for item in raw_edges],
         )

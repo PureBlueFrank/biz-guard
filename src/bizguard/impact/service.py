@@ -20,7 +20,7 @@ class ImpactReport(BaseModel):
     unknown_boundary: bool
     unknown_reason: str | None = None
     evidence: list[dict[str, object]]
-    required_tests: list[dict[str, str]]
+    required_tests: list[dict[str, object]]
     required_approvers: list[str]
 
 

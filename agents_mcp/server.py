@@ -38,9 +38,9 @@ def prepare_change(
     token_budget: int = 2000,
     diff_text: str | None = None,
 ) -> dict[str, object]:
-    """Compile task input; ``diff_text`` remains a legacy compatibility adapter."""
+    """Compile task input; ``diff_text`` returns an explicitly marked legacy decision adapter."""
     if diff_text is not None:
-        return evaluate_change(diff_text).model_dump(mode="json")
+        return {"legacy": True, "result": evaluate_change(diff_text).model_dump(mode="json")}
     if task is None or repos is None or base_revisions is None:
         raise ToolError("task, repos, and base_revisions are required for Context Pack compilation")
     return _compiler().compile(task, repos, base_revisions, principal, token_budget).model_dump(mode="json")
@@ -71,13 +71,13 @@ def analyze_impact(changed_symbol: str, revision: str, capability: str = "coupon
     return ImpactService(_REPOSITORIES).analyze(changed_symbol, revision, capability).model_dump(mode="json")
 
 
-@mcp.tool(description="只读分析 unified diff 的变更风险；不写入文件、不调用外部服务，且没有副作用。")
+@mcp.tool(description="只读确定性 unified diff 校验：不写入文件、不调用外部服务。P5 将与聚合决策分叉。")
 def validate_patch(diff_text: str) -> ChangeSafetyCard:
     return evaluate_change(diff_text)
 
 
 @mcp.tool(description="按语义 catalog 选择必需测试；只读且没有副作用。")
-def get_required_tests(capability: str, policy_id: str) -> list[dict[str, str]]:
+def get_required_tests(capability: str, policy_id: str) -> list[dict[str, object]]:
     catalog = load_catalog(_CATALOG)
     return [item.model_dump() for item in select_required_tests(catalog, capability, policy_id)]
 
@@ -87,7 +87,7 @@ def request_approval(change_context_id: str, requested_by: str, reason: str) -> 
     raise ToolError("request_approval is schema-only until Phase 5; no approval was created")
 
 
-@mcp.tool(description="通过共享决策管线获取变更决定；只读且没有副作用。")
+@mcp.tool(description="当前聚合共享确定性校验结果的只读变更决定；P5 将加入审批聚合。")
 def get_change_decision(diff_text: str) -> ChangeSafetyCard:
     return evaluate_change(diff_text)
 

@@ -7,6 +7,7 @@ from pytest import CaptureFixture
 
 from bizguard.cli import main
 from bizguard.context.compiler import ContextCompiler
+from bizguard.change.store import ChangeContextStore
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.repository import KnowledgeRepository
@@ -25,6 +26,11 @@ def test_prepare_cli_delegates_to_context_compiler(capsys: CaptureFixture[str]) 
     output = json.loads(capsys.readouterr().out)
     expected = ContextCompiler(ROOT / "fixtures/java-microservices").compile("status", ["coupon-core"], REVISIONS).model_dump(mode="json")
     assert output == expected
+    store = ChangeContextStore(ROOT / ".artifacts" / "change-context.sqlite3")
+    try:
+        assert store.get(output["change_context_id"]) == json.dumps(output, ensure_ascii=False, separators=(",", ":"))
+    finally:
+        store.close()
 
 
 def test_impact_context_cli_outputs_pack_impact(tmp_path: Path, capsys: CaptureFixture[str]) -> None:

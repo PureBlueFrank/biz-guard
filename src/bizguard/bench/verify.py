@@ -146,13 +146,38 @@ def _verify_phase4_mcp(root: Path, suite: dict[str, object]) -> None:
             arguments["diff_text"] = (root / str(diff_file)).read_text(encoding="utf-8")
         expects_error = bool(sample.get("error"))
         try:
-            asyncio.run(mcp.call_tool(str(sample["tool"]), arguments))
+            result = asyncio.run(mcp.call_tool(str(sample["tool"]), arguments))
         except (ToolError, ValueError):
             if not expects_error:
                 raise ValueError(f"valid MCP I/O sample failed: {sample['id']}") from None
         else:
             if expects_error:
                 raise ValueError(f"invalid MCP I/O sample unexpectedly succeeded: {sample['id']}")
+            expected = sample.get("expected")
+            if not isinstance(expected, dict):
+                raise ValueError(f"valid MCP I/O sample misses output expectation: {sample['id']}")
+            if not isinstance(result, tuple) or not isinstance(result[1], dict):
+                raise ValueError(f"valid MCP I/O sample has no structured output: {sample['id']}")
+            _assert_expected_output(result[1], expected, str(sample["id"]))
+
+
+def _assert_expected_output(actual: dict[str, object], expected: dict[str, object], sample_id: str) -> None:
+    """Check declared output fields so MCP I/O verification is not connectivity-only."""
+    for key, value in expected.items():
+        if not _contains_expected(actual.get(key), value):
+            raise ValueError(f"MCP I/O output mismatch for {sample_id}: {key}")
+
+
+def _contains_expected(actual: object, expected: object) -> bool:
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and all(
+            key in actual and _contains_expected(actual[key], value) for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) >= len(expected) and all(
+            _contains_expected(value, expected[index]) for index, value in enumerate(actual[:len(expected)])
+        )
+    return actual == expected
 
 
 def _verify_phase2(manifest_path: Path) -> int:

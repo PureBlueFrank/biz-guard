@@ -1,17 +1,17 @@
 # One valid and one invalid, stale, or schema-only request for every Phase 4 tool.
-- {id: prepare-ok, tool: prepare_change, arguments: {task: status, repos: [coupon-core], base_revisions: {coupon-core: fixture-coupon-core-base, __index__: phase3-fixture-v1}}}
+- {id: prepare-ok, tool: prepare_change, arguments: {task: status, repos: [coupon-core], base_revisions: {coupon-core: fixture-coupon-core-base, __index__: phase3-fixture-v1}}, expected: {task: status}}
 - {id: prepare-invalid, tool: prepare_change, arguments: {task: status}, error: true}
-- {id: knowledge-ok, tool: search_team_knowledge, arguments: {query: status, scope: coupon_redemption, revision: semantic-seed-v1, caller_roles: [engineering]}}
+- {id: knowledge-ok, tool: search_team_knowledge, arguments: {query: status, scope: coupon_redemption, revision: semantic-seed-v1, caller_roles: [engineering]}, expected: {entries: [{scope: coupon_redemption}]}}
 - {id: knowledge-invalid, tool: search_team_knowledge, arguments: {query: status, scope: coupon_redemption, revision: semantic-seed-v1, caller_roles: engineering}, error: true}
-- {id: symbol-ok, tool: explain_symbol, arguments: {symbol: 'db://coupon-core/coupon_redemption#status', revision: phase3-fixture-v1}}
+- {id: symbol-ok, tool: explain_symbol, arguments: {symbol: 'db://coupon-core/coupon_redemption#status', revision: phase3-fixture-v1}, expected: {kind: data}}
 - {id: symbol-invalid, tool: explain_symbol, arguments: {symbol: missing, revision: phase3-fixture-v1}, error: true}
-- {id: impact-ok, tool: analyze_impact, arguments: {changed_symbol: 'db://coupon-core/coupon_redemption#status', revision: phase3-fixture-v1}}
+- {id: impact-ok, tool: analyze_impact, arguments: {changed_symbol: 'db://coupon-core/coupon_redemption#status', revision: phase3-fixture-v1}, expected: {changed_symbol: 'db://coupon-core/coupon_redemption#status'}}
 - {id: impact-invalid, tool: analyze_impact, arguments: {changed_symbol: missing, revision: phase3-fixture-v1, capability: missing}, error: true}
-- {id: validate-ok, tool: validate_patch, arguments: {diff_file: sample/diffs/diff_normal_1.diff}}
+- {id: validate-ok, tool: validate_patch, arguments: {diff_file: sample/diffs/diff_normal_1.diff}, expected: {decision: ALLOW}}
 - {id: validate-invalid, tool: validate_patch, arguments: {diff_text: 42}, error: true}
-- {id: tests-ok, tool: get_required_tests, arguments: {capability: coupon_redemption, policy_id: coupon-redemption-aggregate-idempotency-key}}
+- {id: tests-ok, tool: get_required_tests, arguments: {capability: coupon_redemption, policy_id: coupon-redemption-aggregate-idempotency-key}, expected: {result: [{id: coupon-core-redeem-idempotency-test}]}}
 - {id: tests-invalid, tool: get_required_tests, arguments: {capability: missing, policy_id: missing}, error: true}
 - {id: approval-schema-only, tool: request_approval, arguments: {change_context_id: ctx-1, requested_by: engineering, reason: review}, error: true}
 - {id: approval-invalid, tool: request_approval, arguments: {change_context_id: 1, requested_by: engineering, reason: review}, error: true}
-- {id: decision-ok, tool: get_change_decision, arguments: {diff_file: sample/diffs/diff_normal_1.diff}}
+- {id: decision-ok, tool: get_change_decision, arguments: {diff_file: sample/diffs/diff_normal_1.diff}, expected: {decision: ALLOW}}
 - {id: decision-invalid, tool: get_change_decision, arguments: {diff_text: 42}, error: true}

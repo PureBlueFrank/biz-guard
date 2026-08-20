@@ -21,12 +21,14 @@ class CacheKey:
     revisions: tuple[tuple[str, str], ...]
     principal: str
     index_version: str
+    token_budget: int
 
     @classmethod
     def create(
-        cls, task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str
+        cls, task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str,
+        token_budget: int = 2000,
     ) -> "CacheKey":
-        return cls(task, tuple(sorted(repos)), tuple(sorted(revisions.items())), principal, index_version)
+        return cls(task, tuple(sorted(repos)), tuple(sorted(revisions.items())), principal, index_version, token_budget)
 
     @property
     def digest(self) -> str:

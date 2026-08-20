@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Domain(BaseModel):
@@ -63,6 +63,7 @@ class CatalogRequiredTest(BaseModel):
     policy: str
     command: str
     repository: str
+    evidence: list[dict[str, object]] = Field(default_factory=list)
 
 
 class SemanticCatalog(BaseModel):
