@@ -16,8 +16,7 @@ def load_ground_truth_cases() -> list[tuple[str, Decision]]:
     """Load every frozen decision expectation into pytest parameters."""
     ground_truth = yaml.safe_load(GROUND_TRUTH_PATH.read_text(encoding="utf-8"))
     return [
-        (entry["file"], Decision[entry["expected_decision"]])
-        for entry in ground_truth["diffs"]
+        (entry["file"], Decision[entry["expected_decision"]]) for entry in ground_truth["diffs"]
     ]
 
 

@@ -42,7 +42,9 @@ def verify(manifest_path: Path, suite: str) -> int:
         if suite == "phase2":
             return _verify_phase2(manifest_path)
         manifest_path = manifest_path.resolve()
-        manifest = Manifest.model_validate(yaml.safe_load(manifest_path.read_text(encoding="utf-8")))
+        manifest = Manifest.model_validate(
+            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        )
         if manifest.suite != suite:
             raise ValueError(f"manifest suite is {manifest.suite!r}, not {suite!r}")
         if suite == "phase1" and len(manifest.tasks) != 12:
@@ -63,7 +65,9 @@ def verify(manifest_path: Path, suite: str) -> int:
     except (OSError, ValueError, ValidationError, yaml.YAMLError, json.JSONDecodeError) as exc:
         print(f"verification failed: {exc}")
         return 1
-    print(f"{len(manifest.tasks)}/{len(manifest.tasks)} {suite} manifest/schema/golden references loaded")
+    print(
+        f"{len(manifest.tasks)}/{len(manifest.tasks)} {suite} manifest/schema/golden references loaded"
+    )
     return 0
 
 
@@ -73,8 +77,14 @@ def _verify_phase2(manifest_path: Path) -> int:
     from bizguard.semantic.models import load_catalog
     from bizguard.semantic.required_tests import select_required_tests
 
-    payload = yaml.safe_load((root / "bench/golden/semantic/phase2.yaml").read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or not isinstance(payload.get("tasks"), list) or len(payload["tasks"]) != 6:
+    payload = yaml.safe_load(
+        (root / "bench/golden/semantic/phase2.yaml").read_text(encoding="utf-8")
+    )
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("tasks"), list)
+        or len(payload["tasks"]) != 6
+    ):
         raise ValueError("phase2 requires exactly six semantic tasks")
     catalog = load_catalog(root / "src/bizguard/semantic/catalog.yaml")
     for task in payload["tasks"]:
@@ -127,17 +137,21 @@ def _verify_task(
 
 def _verify_outcome(task_id: str, decision: Decision) -> None:
     if decision.outcome is DecisionState.ALLOW and any(
-        finding.status in {CheckStatus.VIOLATED, CheckStatus.INCOMPLETE} for finding in decision.findings
+        finding.status in {CheckStatus.VIOLATED, CheckStatus.INCOMPLETE}
+        for finding in decision.findings
     ):
         raise ValueError(f"task {task_id} ALLOW decision contains a failed or incomplete finding")
     if decision.outcome is DecisionState.REQUIRE_APPROVAL and not any(
         finding.unknown_reason is not None for finding in decision.findings
     ):
         raise ValueError(f"task {task_id} REQUIRE_APPROVAL decision lacks an unknown reason")
-    if any(
-        finding.status is CheckStatus.VIOLATED and finding.policy_mode is PolicyMode.BLOCKING
-        for finding in decision.findings
-    ) and decision.outcome is not DecisionState.BLOCK:
+    if (
+        any(
+            finding.status is CheckStatus.VIOLATED and finding.policy_mode is PolicyMode.BLOCKING
+            for finding in decision.findings
+        )
+        and decision.outcome is not DecisionState.BLOCK
+    ):
         raise ValueError(f"task {task_id} has a blocking violation but is not BLOCK")
 
 
@@ -181,7 +195,9 @@ def _resolve_repo_uri(root: Path, uri: str) -> Path:
     relative_path = Path(unquote(parsed.path.lstrip("/")))
     if not repository or not relative_path.parts or ".." in relative_path.parts:
         raise ValueError(f"invalid repo evidence URI: {uri}")
-    repository_root = root if repository == "bizguard" else root / "fixtures" / "java-microservices" / repository
+    repository_root = (
+        root if repository == "bizguard" else root / "fixtures" / "java-microservices" / repository
+    )
     target = repository_root / relative_path
     if not target.is_file():
         raise ValueError(f"repo evidence URI does not resolve to a file: {uri}")
@@ -192,7 +208,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Verify BizGuard golden benchmark contracts.")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--suite", required=True)
-    parser.add_argument("--offline", action="store_true", help="Accepted for deterministic Phase 2 verification.")
+    parser.add_argument(
+        "--offline", action="store_true", help="Accepted for deterministic Phase 2 verification."
+    )
     args = parser.parse_args()
     raise SystemExit(verify(args.manifest, args.suite))
 

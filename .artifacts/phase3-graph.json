@@ -1,0 +1,1933 @@
+{
+  "edges": [
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/pom.xml",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "service://coupon-contract"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L4:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L5:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract.CouponContract()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L7:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract.isKnownStatus()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L7:C41",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract.status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L8:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#call%3Aequals%408"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L8:C44",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#call%3Aequals%408"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#L8:C74",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#call%3Aequals%408"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#L3:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#CouponContractTest"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#L4:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#CouponContractTest.main()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#L4:C29",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#CouponContractTest.args"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#L5:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#call%3AisKnownStatus%405"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#L6:C17",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-contract",
+      "target_id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#call%3AisKnownStatus%406"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/openapi.yaml#L5:C5",
+      "first_seen": null,
+      "kind": "EXPOSES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "api://coupon-contract/POST/v1/coupons/redeem"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/openapi.yaml#L24:C9",
+      "first_seen": null,
+      "kind": "EXPOSES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "api://coupon-contract/SCHEMA/couponCode"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/openapi.yaml#L25:C9",
+      "first_seen": null,
+      "kind": "EXPOSES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "api://coupon-contract/SCHEMA/idempotencyKey"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/openapi.yaml#L30:C9",
+      "first_seen": null,
+      "kind": "EXPOSES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "api://coupon-contract/SCHEMA/redemptionId"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/openapi.yaml#L31:C9",
+      "first_seen": null,
+      "kind": "EXPOSES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "api://coupon-contract/SCHEMA/status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/coupon.proto#L4:C32",
+      "first_seen": null,
+      "kind": "SERIALIZES_TO",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "proto://coupon.v1/RedeemRequest/coupon_code"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/coupon.proto#L4:C56",
+      "first_seen": null,
+      "kind": "SERIALIZES_TO",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "proto://coupon.v1/RedeemRequest/idempotency_key"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/coupon.proto#L5:C33",
+      "first_seen": null,
+      "kind": "SERIALIZES_TO",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "proto://coupon.v1/RedeemResponse/redemption_id"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-contract/coupon.proto#L5:C59",
+      "first_seen": null,
+      "kind": "SERIALIZES_TO",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "IDL",
+      "source_id": "service://coupon-contract",
+      "target_id": "proto://coupon.v1/RedeemResponse/status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/pom.xml",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "service://coupon-core"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L6:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L7:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.DynamicCouponMapper()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L9:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L9:C31",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.values"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L10:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#call%3AvalueOf%4010"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#L10:C31",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#call%3Aget%4010"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#L6:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#CouponRedemptionRepository"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#L7:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#CouponRedemptionRepository.save()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#L7:C34",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#CouponRedemptionRepository.redemption"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#L3:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#CouponRequest"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#L3:C29",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#CouponRequest.couponCode"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#L3:C48",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#CouponRequest.idempotencyKey"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#L7:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#L9:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController.service"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#L11:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController.redeem()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#L12:C34",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController.request"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#L13:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#call%3Aredeem%4013"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#L3:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#L3:C30",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.redemptionId"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#L3:C51",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L10:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L12:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.producer"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L13:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.repository"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L15:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.redeem()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L15:C5",
+      "first_seen": null,
+      "kind": "BELONGS_TO_CAPABILITY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.redeem()",
+      "target_id": "service://coupon-core"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L15:C34",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.request"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L16:C60",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4016"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L18:C26",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Asave%4018"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L18:C63",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4018"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L19:C13",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Apublish%4019"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L20:C39",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4020"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L20:C68",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Astatus%4020"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L22:C13",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Asave%4022"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#L22:C50",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4022"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L6:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L8:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.idempotencyKey"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L9:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L10:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.CouponRedemption()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L10:C29",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.idempotencyKey"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L10:C52",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L11:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.idempotencyKey()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L12:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.status()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#L8:C26",
+      "first_seen": null,
+      "kind": "MAPS_TO",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.status",
+      "target_id": "db://coupon-core/coupon_redemption#status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#L5:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#L6:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer.publish()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#L6:C25",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer.redemption"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#L5:C17",
+      "first_seen": null,
+      "kind": "PUBLISHES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer.publish()",
+      "target_id": "mq://coupon-core/coupon.redeemed#status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L5:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L6:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest.main()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L6:C5",
+      "first_seen": null,
+      "kind": "BELONGS_TO_CAPABILITY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest.main()",
+      "target_id": "service://coupon-core"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L6:C29",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest.args"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L7:C25",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#call%3Astatus%407"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L7:C25",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#call%3Aredeem%407"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#L8:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://coupon-core",
+      "target_id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#call%3Aequals%408"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/pom.xml",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "service://merchant-service"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#L4:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#L4:C35",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto.redemptionId"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#L4:C56",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto.status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L7:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L8:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.client"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L10:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.MerchantCouponService()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L10:C5",
+      "first_seen": null,
+      "kind": "BELONGS_TO_CAPABILITY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.MerchantCouponService()",
+      "target_id": "service://merchant-service"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L10:C34",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.client"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L12:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.redeemable()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L12:C5",
+      "first_seen": null,
+      "kind": "BELONGS_TO_CAPABILITY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.redeemable()",
+      "target_id": "service://merchant-service"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L12:C31",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.couponCode"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L12:C50",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.idempotencyKey"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L13:C40",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#call%3Aredeem%4013"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L14:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#call%3Aequals%4014"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#L14:C35",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#call%3Astatus%4014"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#L4:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#L5:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.onCouponRedeemed()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#L5:C34",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.status"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#L5:C17",
+      "first_seen": null,
+      "kind": "CONSUMES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "mq://coupon-core/coupon.redeemed#status",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.onCouponRedeemed()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#L6:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#L7:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient.redeem()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#L7:C32",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient.couponCode"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#L7:C51",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient.idempotencyKey"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#L5:C1",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#L6:C5",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest.main()"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#L6:C5",
+      "first_seen": null,
+      "kind": "BELONGS_TO_CAPABILITY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest.main()",
+      "target_id": "service://merchant-service"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#L6:C29",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest.args"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#L9:C16",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://merchant-service",
+      "target_id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#call%3Aredeemable%409"
+    },
+    {
+      "confidence": 0.9,
+      "evidence_uri": "repo://scripts/pom.xml",
+      "first_seen": null,
+      "kind": "DECLARES",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "AST",
+      "source_id": "repo://scripts",
+      "target_id": "service://scripts"
+    },
+    {
+      "confidence": 1,
+      "evidence_uri": "catalog://semantic/catalog.yaml#coupon_redemption",
+      "first_seen": null,
+      "kind": "OWNED_BY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "catalog",
+      "source_id": "capability://coupon-redemption",
+      "target_id": "owner://coupon-platform"
+    },
+    {
+      "confidence": 1,
+      "evidence_uri": "catalog://semantic/catalog.yaml#redeem_idempotency_key_required",
+      "first_seen": null,
+      "kind": "BELONGS_TO_CAPABILITY",
+      "last_seen": null,
+      "revision": "phase3-fixture-v1",
+      "source": "catalog",
+      "source_id": "invariant://redeem-idempotency-key-required",
+      "target_id": "capability://coupon-redemption"
+    }
+  ],
+  "metadata": {
+    "analyzer": "tree-sitter-java",
+    "grammar": "0.23.5",
+    "jvm": "fixture-jdk17",
+    "tree_sitter": "0.24.0"
+  },
+  "nodes": [
+    {
+      "id": "repo://coupon-contract",
+      "kind": "organization",
+      "label": "coupon-contract",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "service://coupon-contract",
+      "kind": "deployment",
+      "label": "coupon-contract",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract",
+      "kind": "code",
+      "label": "CouponContract",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract.CouponContract()",
+      "kind": "code",
+      "label": "CouponContract",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract.isKnownStatus()",
+      "kind": "code",
+      "label": "isKnownStatus",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#CouponContract.status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/main/java/com/bizguard/contract/CouponContract.java#call%3Aequals%408",
+      "kind": "code",
+      "label": "equals",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#CouponContractTest",
+      "kind": "code",
+      "label": "CouponContractTest",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#CouponContractTest.main()",
+      "kind": "code",
+      "label": "main",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#CouponContractTest.args",
+      "kind": "interface",
+      "label": "args",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#call%3AisKnownStatus%405",
+      "kind": "code",
+      "label": "isKnownStatus",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-contract/src/test/java/com/bizguard/contract/CouponContractTest.java#call%3AisKnownStatus%406",
+      "kind": "code",
+      "label": "isKnownStatus",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "api://coupon-contract/POST/v1/coupons/redeem",
+      "kind": "interface",
+      "label": "POST /v1/coupons/redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "api://coupon-contract/SCHEMA/couponCode",
+      "kind": "interface",
+      "label": "couponCode",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "api://coupon-contract/SCHEMA/idempotencyKey",
+      "kind": "interface",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "api://coupon-contract/SCHEMA/redemptionId",
+      "kind": "interface",
+      "label": "redemptionId",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "api://coupon-contract/SCHEMA/status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "proto://coupon.v1/RedeemRequest/coupon_code",
+      "kind": "interface",
+      "label": "coupon_code",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "proto://coupon.v1/RedeemRequest/idempotency_key",
+      "kind": "interface",
+      "label": "idempotency_key",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "proto://coupon.v1/RedeemResponse/redemption_id",
+      "kind": "interface",
+      "label": "redemption_id",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "proto://coupon.v1/RedeemResponse/status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core",
+      "kind": "organization",
+      "label": "coupon-core",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "service://coupon-core",
+      "kind": "deployment",
+      "label": "coupon-core",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper",
+      "kind": "code",
+      "label": "DynamicCouponMapper",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.DynamicCouponMapper()",
+      "kind": "code",
+      "label": "DynamicCouponMapper",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map()",
+      "kind": "code",
+      "label": "map",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.values",
+      "kind": "interface",
+      "label": "values",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#call%3AvalueOf%4010",
+      "kind": "code",
+      "label": "valueOf",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#call%3Aget%4010",
+      "kind": "code",
+      "label": "get",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#CouponRedemptionRepository",
+      "kind": "code",
+      "label": "CouponRedemptionRepository",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#CouponRedemptionRepository.save()",
+      "kind": "code",
+      "label": "save",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java#CouponRedemptionRepository.redemption",
+      "kind": "interface",
+      "label": "redemption",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#CouponRequest",
+      "kind": "code",
+      "label": "CouponRequest",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#CouponRequest.couponCode",
+      "kind": "interface",
+      "label": "couponCode",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java#CouponRequest.idempotencyKey",
+      "kind": "interface",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController",
+      "kind": "code",
+      "label": "CouponController",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController.service",
+      "kind": "interface",
+      "label": "service",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController.redeem()",
+      "kind": "code",
+      "label": "redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#CouponController.request",
+      "kind": "interface",
+      "label": "request",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponController.java#call%3Aredeem%4013",
+      "kind": "code",
+      "label": "redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse",
+      "kind": "code",
+      "label": "CouponResponse",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.redemptionId",
+      "kind": "interface",
+      "label": "redemptionId",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java#CouponResponse.status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService",
+      "kind": "code",
+      "label": "RedeemService",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.producer",
+      "kind": "interface",
+      "label": "producer",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.repository",
+      "kind": "interface",
+      "label": "repository",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.redeem()",
+      "kind": "code",
+      "label": "redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.request",
+      "kind": "interface",
+      "label": "request",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4016",
+      "kind": "code",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Asave%4018",
+      "kind": "code",
+      "label": "save",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4018",
+      "kind": "code",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Apublish%4019",
+      "kind": "code",
+      "label": "publish",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4020",
+      "kind": "code",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Astatus%4020",
+      "kind": "code",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3Asave%4022",
+      "kind": "code",
+      "label": "save",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#call%3AidempotencyKey%4022",
+      "kind": "code",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption",
+      "kind": "code",
+      "label": "CouponRedemption",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.idempotencyKey",
+      "kind": "interface",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.CouponRedemption()",
+      "kind": "code",
+      "label": "CouponRedemption",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.idempotencyKey()",
+      "kind": "code",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java#CouponRedemption.status()",
+      "kind": "code",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "db://coupon-core/coupon_redemption#status",
+      "kind": "data",
+      "label": "coupon_redemption.status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer",
+      "kind": "code",
+      "label": "CouponRedeemedProducer",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer.publish()",
+      "kind": "code",
+      "label": "publish",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/main/java/com/bizguard/coupon/messaging/CouponRedeemedProducer.java#CouponRedeemedProducer.redemption",
+      "kind": "interface",
+      "label": "redemption",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "mq://coupon-core/coupon.redeemed#status",
+      "kind": "messaging",
+      "label": "coupon.redeemed.status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest",
+      "kind": "code",
+      "label": "RedeemServiceTest",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest.main()",
+      "kind": "code",
+      "label": "main",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#RedeemServiceTest.args",
+      "kind": "interface",
+      "label": "args",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#call%3Astatus%407",
+      "kind": "code",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#call%3Aredeem%407",
+      "kind": "code",
+      "label": "redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://coupon-core/src/test/java/com/bizguard/coupon/application/RedeemServiceTest.java#call%3Aequals%408",
+      "kind": "code",
+      "label": "equals",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service",
+      "kind": "organization",
+      "label": "merchant-service",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "service://merchant-service",
+      "kind": "deployment",
+      "label": "merchant-service",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto",
+      "kind": "code",
+      "label": "CouponRedemptionDto",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto.redemptionId",
+      "kind": "interface",
+      "label": "redemptionId",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/api/CouponRedemptionDto.java#CouponRedemptionDto.status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService",
+      "kind": "code",
+      "label": "MerchantCouponService",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.client",
+      "kind": "interface",
+      "label": "client",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.MerchantCouponService()",
+      "kind": "code",
+      "label": "MerchantCouponService",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.redeemable()",
+      "kind": "code",
+      "label": "redeemable",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.couponCode",
+      "kind": "interface",
+      "label": "couponCode",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#MerchantCouponService.idempotencyKey",
+      "kind": "interface",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#call%3Aredeem%4013",
+      "kind": "code",
+      "label": "redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#call%3Aequals%4014",
+      "kind": "code",
+      "label": "equals",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/application/MerchantCouponService.java#call%3Astatus%4014",
+      "kind": "code",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer",
+      "kind": "code",
+      "label": "CouponRedeemedConsumer",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.onCouponRedeemed()",
+      "kind": "code",
+      "label": "onCouponRedeemed",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/messaging/CouponRedeemedConsumer.java#CouponRedeemedConsumer.status",
+      "kind": "interface",
+      "label": "status",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient",
+      "kind": "code",
+      "label": "CouponCoreClient",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient.redeem()",
+      "kind": "code",
+      "label": "redeem",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient.couponCode",
+      "kind": "interface",
+      "label": "couponCode",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/main/java/com/bizguard/merchant/client/CouponCoreClient.java#CouponCoreClient.idempotencyKey",
+      "kind": "interface",
+      "label": "idempotencyKey",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest",
+      "kind": "code",
+      "label": "MerchantCouponServiceTest",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest.main()",
+      "kind": "code",
+      "label": "main",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#MerchantCouponServiceTest.args",
+      "kind": "interface",
+      "label": "args",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://merchant-service/src/test/java/com/bizguard/merchant/application/MerchantCouponServiceTest.java#call%3Aredeemable%409",
+      "kind": "code",
+      "label": "redeemable",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "repo://scripts",
+      "kind": "organization",
+      "label": "scripts",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "service://scripts",
+      "kind": "deployment",
+      "label": "scripts",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "capability://coupon-redemption",
+      "kind": "business",
+      "label": "coupon redemption",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "owner://coupon-platform",
+      "kind": "organization",
+      "label": "Coupon Platform",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    },
+    {
+      "id": "invariant://redeem-idempotency-key-required",
+      "kind": "business",
+      "label": "idempotency key required",
+      "properties": {},
+      "revision": "phase3-fixture-v1"
+    }
+  ],
+  "revision": "phase3-fixture-v1"
+}

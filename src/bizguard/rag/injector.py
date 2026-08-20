@@ -127,7 +127,8 @@ def inject_full_text(
         for contract in matched_contracts
     )
     knowledge_text = "\n\n".join(
-        f"## Knowledge: {document.id}\n{document.content.strip()}" for document in knowledge_documents
+        f"## Knowledge: {document.id}\n{document.content.strip()}"
+        for document in knowledge_documents
     )
     return RetrievalEvidence(
         contract_ids=[contract.id for contract in matched_contracts],

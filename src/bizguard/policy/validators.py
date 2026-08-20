@@ -30,16 +30,25 @@ def validate_invariant(
             evidence_refs=references,
         )
     target_class = next(
-        (node for node in module.body if isinstance(node, ast.ClassDef) and node.name == invariant.target.class_name),
-        None,
-    )
-    target_function = None if target_class is None else next(
         (
             node
-            for node in target_class.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == invariant.target.function
+            for node in module.body
+            if isinstance(node, ast.ClassDef) and node.name == invariant.target.class_name
         ),
         None,
+    )
+    target_function = (
+        None
+        if target_class is None
+        else next(
+            (
+                node
+                for node in target_class.body
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == invariant.target.function
+            ),
+            None,
+        )
     )
     if target_function is None:
         return _violation(invariant, references, "未找到受 Policy 保护的目标方法。")
@@ -47,10 +56,16 @@ def validate_invariant(
     if invariant.transaction_context.decorator not in decorators:
         return _violation(invariant, references, "目标方法缺少要求的事务装饰器。")
     calls = [node for node in ast.walk(target_function) if isinstance(node, ast.Call)]
-    required_calls = [node for node in calls if _call_matches(node.func, invariant.required_call.call)]
-    protected_calls = [node for node in calls if _call_matches(node.func, invariant.required_call.before)]
+    required_calls = [
+        node for node in calls if _call_matches(node.func, invariant.required_call.call)
+    ]
+    protected_calls = [
+        node for node in calls if _call_matches(node.func, invariant.required_call.before)
+    ]
     has_argument = any(
-        node.args and isinstance(node.args[0], ast.Name) and node.args[0].id == invariant.required_call.argument
+        node.args
+        and isinstance(node.args[0], ast.Name)
+        and node.args[0].id == invariant.required_call.argument
         for node in required_calls
     )
     if not has_argument or not protected_calls:

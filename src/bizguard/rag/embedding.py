@@ -150,7 +150,9 @@ def retrieve_document_ids(
     """Rank document IDs by their best chunk cosine similarity to ``query``."""
     if limit < 1:
         raise ValueError("limit must be positive")
-    chunk_records = [(document.id, chunk) for document in documents for chunk in split_document(document)]
+    chunk_records = [
+        (document.id, chunk) for document in documents for chunk in split_document(document)
+    ]
     if not chunk_records:
         return []
     query_vectors = embedder.embed([query])
@@ -159,7 +161,11 @@ def retrieve_document_ids(
         raise ValueError("embedder returned a vector count different from its inputs")
     query_vector = np.asarray(query_vectors[0], dtype=float)
     chunk_vectors = np.asarray(chunk_vectors_raw, dtype=float)
-    if query_vector.ndim != 1 or chunk_vectors.ndim != 2 or chunk_vectors.shape[1] != query_vector.size:
+    if (
+        query_vector.ndim != 1
+        or chunk_vectors.ndim != 2
+        or chunk_vectors.shape[1] != query_vector.size
+    ):
         raise ValueError("embedding vectors must have matching non-empty dimensions")
     query_norm = np.linalg.norm(query_vector)
     chunk_norms = np.linalg.norm(chunk_vectors, axis=1)
@@ -169,4 +175,7 @@ def retrieve_document_ids(
     scores: dict[str, float] = {}
     for (document_id, _), score in zip(chunk_records, similarities, strict=True):
         scores[document_id] = max(scores.get(document_id, float("-inf")), float(score))
-    return [document_id for document_id, _ in sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]]
+    return [
+        document_id
+        for document_id, _ in sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ]

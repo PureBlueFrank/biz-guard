@@ -43,7 +43,10 @@ def load_eval_queries(path: Path) -> list[RagEvalQuery]:
 
 
 def evaluate_recall(
-    queries: list[RagEvalQuery], documents: list[KnowledgeDocument], embedder: TextEmbedder, ks: tuple[int, ...] = (1, 5)
+    queries: list[RagEvalQuery],
+    documents: list[KnowledgeDocument],
+    embedder: TextEmbedder,
+    ks: tuple[int, ...] = (1, 5),
 ) -> EmbeddingEvalResult:
     """Calculate whether any ground-truth document appears in each top-k result."""
     if not queries:
@@ -55,7 +58,10 @@ def evaluate_recall(
             raise ValueError(f"query {query.id} references unknown document IDs: {sorted(unknown)}")
     recall_at_k = {
         k: sum(
-            bool(set(retrieve_document_ids(query.query, documents, embedder, k)) & set(query.ground_truth_document_ids))
+            bool(
+                set(retrieve_document_ids(query.query, documents, embedder, k))
+                & set(query.ground_truth_document_ids)
+            )
             for query in queries
         )
         / len(queries)
@@ -70,7 +76,9 @@ def main() -> int:
     """Run the isolated Zhipu Recall@1/Recall@5 evaluation and print JSON."""
     project_root = Path(__file__).resolve().parents[3]
     parser = argparse.ArgumentParser(description="Evaluate cached Zhipu embedding retrieval.")
-    parser.add_argument("--queries", type=Path, default=project_root / "tests/fixtures/rag_eval_queries.yaml")
+    parser.add_argument(
+        "--queries", type=Path, default=project_root / "tests/fixtures/rag_eval_queries.yaml"
+    )
     parser.add_argument("--knowledge-dir", type=Path, default=project_root / "knowledge")
     parser.add_argument("--cache-dir", type=Path, default=project_root / ".cache/embeddings")
     arguments = parser.parse_args()

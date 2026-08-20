@@ -4,12 +4,14 @@ from bizguard.decision import FaultCode
 from bizguard.domain.enums import DecisionState, UnknownReason
 
 
-_APPROVAL_FAULTS = frozenset({
-    UnknownReason.INDEX_LAG,
-    UnknownReason.REVISION_MISMATCH,
-    UnknownReason.PERMISSION_DENIED,
-    UnknownReason.DYNAMIC_BOUNDARY,
-})
+_APPROVAL_FAULTS = frozenset(
+    {
+        UnknownReason.INDEX_LAG,
+        UnknownReason.REVISION_MISMATCH,
+        UnknownReason.PERMISSION_DENIED,
+        UnknownReason.DYNAMIC_BOUNDARY,
+    }
+)
 _TEST_FAULTS = frozenset({UnknownReason.TEST_EVIDENCE_MISSING})
 _BLOCKING_FAULTS = frozenset({UnknownReason.MALFORMED_INPUT, UnknownReason.UNSUPPORTED_DIFF})
 
@@ -75,6 +77,11 @@ def _map_legacy_fault(fault_code: object | None) -> DecisionState:
         code = FaultCode(str(raw_code))
     except ValueError:
         return DecisionState.BLOCK
-    if code in {FaultCode.POLICY_UNCOVERED, FaultCode.RETRIEVAL_EMPTY, FaultCode.EMBEDDING_TIMEOUT, FaultCode.MCP_DISCONNECTED}:
+    if code in {
+        FaultCode.POLICY_UNCOVERED,
+        FaultCode.RETRIEVAL_EMPTY,
+        FaultCode.EMBEDDING_TIMEOUT,
+        FaultCode.MCP_DISCONNECTED,
+    }:
         return DecisionState.REQUIRE_APPROVAL
     return DecisionState.BLOCK

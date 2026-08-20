@@ -11,7 +11,9 @@ def catalog() -> SemanticCatalog:
     return load_catalog(Path(__file__).parents[1] / "src/bizguard/semantic/catalog.yaml")
 
 
-@pytest.mark.parametrize("identifier", ["coupon_redemption", "coupon_redemption", "coupon_redemption"])
+@pytest.mark.parametrize(
+    "identifier", ["coupon_redemption", "coupon_redemption", "coupon_redemption"]
+)
 def test_capability_is_frozen(catalog: SemanticCatalog, identifier: str) -> None:
     assert catalog.capability(identifier).owner == "coupon_platform"
 

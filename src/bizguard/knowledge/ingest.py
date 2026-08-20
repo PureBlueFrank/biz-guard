@@ -23,7 +23,9 @@ _INJECTION = re.compile(
 )
 
 
-def ingest_file(path: Path, repository: KnowledgeRepository, generated: bool = False) -> KnowledgeEntry:
+def ingest_file(
+    path: Path, repository: KnowledgeRepository, generated: bool = False
+) -> KnowledgeEntry:
     """Validate and store one Markdown record, refusing instruction-like content."""
     raw = path.read_text(encoding="utf-8")
     if _INJECTION.search(raw):

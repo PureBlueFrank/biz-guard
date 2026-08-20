@@ -42,9 +42,14 @@ def evaluate(
             forbidden_acl = list(task.get("forbidden_acl_ids", []))
             if not set(expected + forbidden + forbidden_stale + forbidden_acl).issubset(known):
                 raise ValueError(f"task {task.get('id')} references missing knowledge id")
-            result = HybridSearch(repo, LocalVectorAdapter()).search(SearchRequest(
-                query=task["query"], caller_roles=task["caller_roles"], scope=task["scope"], revision=task["revision"]
-            ))
+            result = HybridSearch(repo, LocalVectorAdapter()).search(
+                SearchRequest(
+                    query=task["query"],
+                    caller_roles=task["caller_roles"],
+                    scope=task["scope"],
+                    revision=task["revision"],
+                )
+            )
             actual = [entry.id for entry in result.entries]
             leaked = set(actual) & set(forbidden + forbidden_stale + forbidden_acl)
             stale_leaks += len(set(actual) & set(forbidden_stale))
@@ -52,15 +57,23 @@ def evaluate(
             required_policy = task.get("mandatory_policy")
             policy_ok = required_policy is None or required_policy in result.mandatory_policy_ids
             policy_hits += int(policy_ok) if required_policy else 0
-            record = {"id": task["id"], "expected_ids": expected, "actual_ids": actual, "passed": actual == expected and not leaked and policy_ok}
+            record = {
+                "id": task["id"],
+                "expected_ids": expected,
+                "actual_ids": actual,
+                "passed": actual == expected and not leaked and policy_ok,
+            }
             records.append(record)
         failures = [record["id"] for record in records if not record["passed"]]
         if failures and strict:
             raise ValueError(f"retrieval golden mismatch: {', '.join(failures)}")
         required_count = sum(bool(task.get("mandatory_policy")) for task in tasks)
         return {
-            "query_count": len(tasks), "mandatory_policy_recall": policy_hits / required_count if required_count else 1.0,
-            "stale_knowledge_rate": stale_leaks / len(tasks), "acl_leak_count": acl_leaks, "records": records,
+            "query_count": len(tasks),
+            "mandatory_policy_recall": policy_hits / required_count if required_count else 1.0,
+            "stale_knowledge_rate": stale_leaks / len(tasks),
+            "acl_leak_count": acl_leaks,
+            "records": records,
         }
     finally:
         repo.close()

@@ -42,7 +42,10 @@ def test_unknown_or_missing_fault_is_conservatively_blocked() -> None:
 
 
 def test_check_incomplete_never_becomes_allow() -> None:
-    assert map_legacy_decision(Card("CHECK_INCOMPLETE", [Fault("INDEX_LAG")])) is not DecisionState.ALLOW
+    assert (
+        map_legacy_decision(Card("CHECK_INCOMPLETE", [Fault("INDEX_LAG")]))
+        is not DecisionState.ALLOW
+    )
 
 
 @pytest.mark.parametrize("fault", list(FaultCode))

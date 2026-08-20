@@ -17,21 +17,57 @@ def search() -> HybridSearch:
     return HybridSearch(repo, LocalVectorAdapter())
 
 
-@pytest.mark.parametrize(("query", "first"), [("idempotency_key", "field-idempotency-key"), ("ledger status", "field-ledger-status"), ("Redeem public API", "adr-api-contract"), ("CouponService protobuf", "proto-redeem")])
+@pytest.mark.parametrize(
+    ("query", "first"),
+    [
+        ("idempotency_key", "field-idempotency-key"),
+        ("ledger status", "field-ledger-status"),
+        ("Redeem public API", "adr-api-contract"),
+        ("CouponService protobuf", "proto-redeem"),
+    ],
+)
 def test_exact_bm25_first_result(search: HybridSearch, query: str, first: str) -> None:
-    result = search.search(SearchRequest(query=query, caller_roles=["engineering"], scope="coupon_redemption", revision="semantic-seed-v1"))
+    result = search.search(
+        SearchRequest(
+            query=query,
+            caller_roles=["engineering"],
+            scope="coupon_redemption",
+            revision="semantic-seed-v1",
+        )
+    )
     assert result.entries[0].id == first
     assert result.traces
 
 
-@pytest.mark.parametrize(("query", "gold"), [("duplicate timeout replay", "adr-double-redeem"), ("reflection mapping", "dynamic-mapper-boundary"), ("merchant event consumer", "merchant-consumer")])
+@pytest.mark.parametrize(
+    ("query", "gold"),
+    [
+        ("duplicate timeout replay", "adr-double-redeem"),
+        ("reflection mapping", "dynamic-mapper-boundary"),
+        ("merchant event consumer", "merchant-consumer"),
+    ],
+)
 def test_semantic_gold_is_recalled(search: HybridSearch, query: str, gold: str) -> None:
-    result = search.search(SearchRequest(query=query, caller_roles=["engineering"], scope="coupon_redemption", revision="semantic-seed-v1"))
+    result = search.search(
+        SearchRequest(
+            query=query,
+            caller_roles=["engineering"],
+            scope="coupon_redemption",
+            revision="semantic-seed-v1",
+        )
+    )
     assert gold in [item.id for item in result.entries]
 
 
 def test_acl_and_stale_are_eliminated_before_results(search: HybridSearch) -> None:
-    result = search.search(SearchRequest(query="incident legacy", caller_roles=["engineering"], scope="coupon_redemption", revision="semantic-seed-v1"))
+    result = search.search(
+        SearchRequest(
+            query="incident legacy",
+            caller_roles=["engineering"],
+            scope="coupon_redemption",
+            revision="semantic-seed-v1",
+        )
+    )
     assert {item.id for item in result.entries}.isdisjoint({"restricted-incident", "stale-ledger"})
     reasons = {item.id: item.elimination_reason for item in result.traces}
     assert reasons["restricted-incident"] == "acl_denied" and reasons["stale-ledger"] == "stale"
@@ -56,7 +92,9 @@ def test_evaluator_counts_forbidden_acl_and_stale_documents_when_returned(
     def leaking_search(self: HybridSearch, request: SearchRequest) -> SearchResult:
         result = original_search(self, request)
         if request.caller_roles == ["public"]:
-            restricted = next(item for item in self._repository.all() if item.id == "restricted-incident")
+            restricted = next(
+                item for item in self._repository.all() if item.id == "restricted-incident"
+            )
             return result.model_copy(update={"entries": [*result.entries, restricted]})
         if request.query == "legacy ledger":
             stale = next(item for item in self._repository.all() if item.id == "stale-ledger")
@@ -64,12 +102,24 @@ def test_evaluator_counts_forbidden_acl_and_stale_documents_when_returned(
         return result
 
     monkeypatch.setattr(HybridSearch, "search", leaking_search)
-    report = evaluate(Path(__file__).parents[1] / "bench/golden/retrieval/phase2.yaml", strict=False)
+    report = evaluate(
+        Path(__file__).parents[1] / "bench/golden/retrieval/phase2.yaml", strict=False
+    )
     assert report["acl_leak_count"] > 0
     assert report["stale_knowledge_rate"] > 0
 
 
 def test_search_reports_embedding_evidence_and_lexical_degradation(search: HybridSearch) -> None:
-    result = search.search(SearchRequest(query="ledger", caller_roles=["engineering"], scope="coupon_redemption", revision="semantic-seed-v1"))
+    result = search.search(
+        SearchRequest(
+            query="ledger",
+            caller_roles=["engineering"],
+            scope="coupon_redemption",
+            revision="semantic-seed-v1",
+        )
+    )
     assert result.semantic_channel.startswith("DEGRADED:")
-    assert (result.embedding_model, result.embedding_cache_version) == ("embedding-3", "offline-hash-v1")
+    assert (result.embedding_model, result.embedding_cache_version) == (
+        "embedding-3",
+        "offline-hash-v1",
+    )

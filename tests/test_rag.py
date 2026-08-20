@@ -51,18 +51,27 @@ def test_full_text_injection_returns_no_fabricated_evidence_without_a_contract()
     parsed_diff = ParsedDiff(
         files=[
             ParsedFile(
-                old_path=None, new_path="sample/coupon-service/unknown.py", operation="modify", hunks=[]
+                old_path=None,
+                new_path="sample/coupon-service/unknown.py",
+                operation="modify",
+                hunks=[],
             )
         ]
     )
-    evidence = inject_full_text(parsed_diff, [], load_knowledge_documents(PROJECT_ROOT / "knowledge"))
+    evidence = inject_full_text(
+        parsed_diff, [], load_knowledge_documents(PROJECT_ROOT / "knowledge")
+    )
     assert evidence == evidence.__class__(contract_ids=[], knowledge_document_ids=[], full_text="")
 
 
 def test_frozen_eval_fixture_has_ten_queries_and_covers_every_knowledge_document() -> None:
     queries = load_eval_queries(PROJECT_ROOT / "tests" / "fixtures" / "rag_eval_queries.yaml")
-    document_ids = {document.id for document in load_knowledge_documents(PROJECT_ROOT / "knowledge")}
-    ground_truth_ids = {document_id for query in queries for document_id in query.ground_truth_document_ids}
+    document_ids = {
+        document.id for document in load_knowledge_documents(PROJECT_ROOT / "knowledge")
+    }
+    ground_truth_ids = {
+        document_id for query in queries for document_id in query.ground_truth_document_ids
+    }
     assert len(queries) == 10
     assert document_ids <= ground_truth_ids
 
@@ -76,18 +85,27 @@ def test_embedding_evaluation_wiring_calculates_recall_at_one_and_five() -> None
     assert all(0.0 <= value <= 1.0 for value in result.recall_at_k.values())
 
 
-def test_embedding_client_reuses_valid_cache_without_network(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_embedding_client_reuses_valid_cache_without_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client = ZhipuEmbeddingClient("not-a-real-key", tmp_path)
     texts = ["cached text"]
     cache_path = client._cache_path(texts)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(
         json.dumps(
-            {"cache_version": CACHE_VERSION, "model": EMBEDDING_MODEL, "texts": texts, "vectors": [[1, 2]]}
+            {
+                "cache_version": CACHE_VERSION,
+                "model": EMBEDDING_MODEL,
+                "texts": texts,
+                "vectors": [[1, 2]],
+            }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr("bizguard.rag.embedding.httpx.post", lambda *args, **kwargs: pytest.fail("network used"))
+    monkeypatch.setattr(
+        "bizguard.rag.embedding.httpx.post", lambda *args, **kwargs: pytest.fail("network used")
+    )
     assert client.embed(texts) == [[1.0, 2.0]]
 
 

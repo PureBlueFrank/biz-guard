@@ -5,7 +5,9 @@ from __future__ import annotations
 from bizguard.semantic.models import CatalogRequiredTest, SemanticCatalog
 
 
-def select_required_tests(catalog: SemanticCatalog, capability: str, policy_id: str) -> list[CatalogRequiredTest]:
+def select_required_tests(
+    catalog: SemanticCatalog, capability: str, policy_id: str
+) -> list[CatalogRequiredTest]:
     owner = catalog.capability(capability).owner
     return [
         test

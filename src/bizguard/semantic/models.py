@@ -96,4 +96,6 @@ def load_catalog(path: Path) -> SemanticCatalog:
     if not isinstance(raw, dict):
         raise ValueError("semantic catalog must be a mapping")
     allowed = set(SemanticCatalog.model_fields)
-    return SemanticCatalog.model_validate({key: value for key, value in raw.items() if key in allowed})
+    return SemanticCatalog.model_validate(
+        {key: value for key, value in raw.items() if key in allowed}
+    )

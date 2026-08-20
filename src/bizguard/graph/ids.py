@@ -48,7 +48,9 @@ def mq_id(service: str, topic: str, message: str | None = None) -> str:
 
 def java_symbol(class_name: str, method: str, parameter_types: tuple[str, ...] = ()) -> str:
     """Return the frozen Java method fragment ``Class.method(Type,Type)``."""
-    return f"{_part(class_name)}.{_part(method)}({','.join(_part(item) for item in parameter_types)})"
+    return (
+        f"{_part(class_name)}.{_part(method)}({','.join(_part(item) for item in parameter_types)})"
+    )
 
 
 def _part(value: str) -> str:

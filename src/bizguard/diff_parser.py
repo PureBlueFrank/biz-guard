@@ -103,7 +103,9 @@ def parse(diff_text: str) -> ParsedDiff:
         for path in (old_path, new_path):
             if path is not None:
                 _validate_path(path)
-        files.append(ParsedFile(old_path=old_path, new_path=new_path, operation=operation, hunks=hunks))
+        files.append(
+            ParsedFile(old_path=old_path, new_path=new_path, operation=operation, hunks=hunks)
+        )
     return ParsedDiff(files=files)
 
 

@@ -91,7 +91,10 @@ def evaluate_change(diff_text: str) -> ChangeSafetyCard:
 
     changed_paths = {_service_path(file) for file in parsed_diff.files}
     covered_policy_ids = {
-        policy_id for contract in registry if contract.source in changed_paths for policy_id in contract.policy_ids
+        policy_id
+        for contract in registry
+        if contract.source in changed_paths
+        for policy_id in contract.policy_ids
     }
     if not covered_policy_ids:
         return _incomplete(
@@ -138,7 +141,9 @@ def evaluate_change(diff_text: str) -> ChangeSafetyCard:
         findings.append(validate_invariant(parsed_diff, full_text, invariant))
     findings.sort(key=lambda finding: finding.finding_id)
     if any(finding.status is FindingStatus.INCOMPLETE for finding in findings):
-        return ChangeSafetyCard(decision=Decision.CHECK_INCOMPLETE, findings=findings, faults=faults)
+        return ChangeSafetyCard(
+            decision=Decision.CHECK_INCOMPLETE, findings=findings, faults=faults
+        )
     if any(finding.status is FindingStatus.VIOLATED for finding in findings):
         return ChangeSafetyCard(decision=Decision.BLOCK, findings=findings, faults=[])
     return ChangeSafetyCard(decision=Decision.ALLOW, findings=findings, faults=[])

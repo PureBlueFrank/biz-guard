@@ -72,7 +72,9 @@ def load_invariants(path: Path) -> list[Invariant]:
         if not invariant.evidence_refs:
             raise PolicyLoadError(f"invariant {invariant.id} must include evidence references")
         if any(":" not in reference for reference in invariant.evidence_refs):
-            raise PolicyLoadError(f"invariant {invariant.id} contains an invalid evidence reference")
+            raise PolicyLoadError(
+                f"invariant {invariant.id} contains an invalid evidence reference"
+            )
     _validate_cross_file_references(path, invariants)
     return invariants
 
@@ -80,7 +82,9 @@ def load_invariants(path: Path) -> list[Invariant]:
 def _validate_cross_file_references(path: Path, invariants: list[Invariant]) -> None:
     project_root = path.parent.parent
     try:
-        registry = yaml.safe_load((project_root / "registry" / "contracts.yaml").read_text(encoding="utf-8"))
+        registry = yaml.safe_load(
+            (project_root / "registry" / "contracts.yaml").read_text(encoding="utf-8")
+        )
         if not isinstance(registry, dict) or not isinstance(registry.get("contracts"), list):
             raise PolicyLoadError("contract registry has no contracts list")
         contract_ids = {
@@ -101,7 +105,9 @@ def _validate_cross_file_references(path: Path, invariants: list[Invariant]) -> 
     invariant_ids = {invariant.id for invariant in invariants}
     unknown_policy_ids = (registry_policy_ids | knowledge_policy_ids) - invariant_ids
     if unknown_policy_ids:
-        raise PolicyLoadError(f"unknown Policy IDs referenced outside invariants: {sorted(unknown_policy_ids)}")
+        raise PolicyLoadError(
+            f"unknown Policy IDs referenced outside invariants: {sorted(unknown_policy_ids)}"
+        )
     for invariant in invariants:
         for reference in invariant.evidence_refs:
             kind, identifier = reference.split(":", maxsplit=1)
@@ -125,5 +131,7 @@ def _knowledge_references(directory: Path) -> tuple[set[str], set[str]]:
         identifiers.add(metadata["id"])
         raw_policy_ids = metadata.get("policy_ids")
         if isinstance(raw_policy_ids, list):
-            policy_ids.update(policy_id for policy_id in raw_policy_ids if isinstance(policy_id, str))
+            policy_ids.update(
+                policy_id for policy_id in raw_policy_ids if isinstance(policy_id, str)
+            )
     return identifiers, policy_ids
