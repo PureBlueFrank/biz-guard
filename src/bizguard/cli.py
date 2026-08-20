@@ -15,6 +15,14 @@ from bizguard.decision import (
     FindingStatus,
     evaluate_change,
 )
+from bizguard.context.compiler import ContextCompiler, ContextPack
+from bizguard.knowledge.ingest import ingest_directory
+from bizguard.knowledge.models import SearchRequest
+from bizguard.knowledge.repository import KnowledgeRepository
+from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
+from bizguard.semantic.models import load_catalog
+from bizguard.semantic.required_tests import select_required_tests
+from bizguard.symbols.service import SymbolService
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -24,19 +32,58 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_parser = subparsers.add_parser("check")
     check_parser.add_argument("--diff", type=Path, required=True)
     impact_parser = subparsers.add_parser("impact")
-    impact_subparsers = impact_parser.add_subparsers(dest="impact_command", required=True)
+    impact_subparsers = impact_parser.add_subparsers(dest="impact_command")
     analyze_parser = impact_subparsers.add_parser("analyze")
     analyze_parser.add_argument("--diff", type=Path, required=True)
     analyze_parser.add_argument("--repos", type=Path, required=True)
     analyze_parser.add_argument("--revision-set", type=Path, required=True)
     analyze_parser.add_argument("--format", choices=["json"], default="json")
+    prepare_parser = subparsers.add_parser("prepare")
+    prepare_parser.add_argument("--task", required=True)
+    prepare_parser.add_argument("--repos", nargs="+", required=True)
+    prepare_parser.add_argument("--base-revisions", type=Path, required=True)
+    prepare_parser.add_argument("--principal", default="engineering")
+    prepare_parser.add_argument("--token-budget", type=int, default=2000)
+    prepare_parser.add_argument("--json", action="store_true")
+    impact_parser.add_argument("--change-context", type=Path)
+    impact_parser.add_argument("--json", action="store_true")
+    knowledge_parser = subparsers.add_parser("knowledge")
+    knowledge_subparsers = knowledge_parser.add_subparsers(dest="knowledge_command", required=True)
+    knowledge_search = knowledge_subparsers.add_parser("search")
+    knowledge_search.add_argument("--query", required=True)
+    knowledge_search.add_argument("--scope", default="coupon_redemption")
+    knowledge_search.add_argument("--revision", default="semantic-seed-v1")
+    knowledge_search.add_argument("--roles", nargs="+", default=["engineering"])
+    knowledge_search.add_argument("--json", action="store_true")
+    symbol_parser = subparsers.add_parser("symbol")
+    symbol_subparsers = symbol_parser.add_subparsers(dest="symbol_command", required=True)
+    symbol_explain = symbol_subparsers.add_parser("explain")
+    symbol_explain.add_argument("--symbol", required=True)
+    symbol_explain.add_argument("--revision", required=True)
+    symbol_explain.add_argument("--json", action="store_true")
+    tests_parser = subparsers.add_parser("tests")
+    tests_subparsers = tests_parser.add_subparsers(dest="tests_command", required=True)
+    tests_required = tests_subparsers.add_parser("required")
+    tests_required.add_argument("--capability", required=True)
+    tests_required.add_argument("--policy", required=True)
+    tests_required.add_argument("--json", action="store_true")
     try:
         arguments = parser.parse_args(argv)
     except SystemExit:
         _print_card(_invalid_input_card("命令参数无效；请使用 bizguard check --diff FILE。"))
         return 2
+    if arguments.command == "prepare":
+        return _prepare(arguments)
+    if arguments.command == "impact" and arguments.change_context:
+        return _context_impact(arguments)
     if arguments.command == "impact":
         return _impact(arguments)
+    if arguments.command == "knowledge":
+        return _knowledge_search(arguments)
+    if arguments.command == "symbol":
+        return _symbol_explain(arguments)
+    if arguments.command == "tests":
+        return _tests_required(arguments)
     diff_path = arguments.diff
     if not diff_path.is_file() or not diff_path.stat().st_mode:
         print("--diff must identify an existing readable unified diff file", file=sys.stderr)
@@ -61,6 +108,9 @@ def _impact(arguments: argparse.Namespace) -> int:
     from bizguard.graph.indexer import index
     from bizguard.impact.analyzer import analyze
 
+    if not getattr(arguments, "impact_command", None):
+        print("impact requires --change-context or the legacy analyze subcommand", file=sys.stderr)
+        return 2
     raw = yaml.safe_load(arguments.revision_set.read_text(encoding="utf-8")) or {}
     revision = str(raw.get("revision", "phase3-fixture-v1"))
     diff_text = arguments.diff.read_text(encoding="utf-8")
@@ -78,6 +128,54 @@ def _impact(arguments: argparse.Namespace) -> int:
             sort_keys=True,
         )
     )
+    return 0
+
+
+def _project_root() -> Path:
+    return Path(__file__).parents[2]
+
+
+def _prepare(arguments: argparse.Namespace) -> int:
+    root = _project_root()
+    compiler = ContextCompiler(root / "fixtures/java-microservices")
+    pack = compiler.compile(
+        arguments.task, arguments.repos, arguments.base_revisions, arguments.principal, arguments.token_budget
+    )
+    print(pack.model_dump_json())
+    return 0
+
+
+def _context_impact(arguments: argparse.Namespace) -> int:
+    pack = ContextPack.model_validate_json(arguments.change_context.read_text(encoding="utf-8"))
+    print(json.dumps(pack.impact.model_dump(mode="json"), sort_keys=True))
+    return 0
+
+
+def _knowledge_search(arguments: argparse.Namespace) -> int:
+    root = _project_root()
+    repository = KnowledgeRepository.memory()
+    try:
+        ingest_directory(root / "knowledge/published", repository)
+        result = HybridSearch(repository, LocalVectorAdapter()).search(
+            SearchRequest(query=arguments.query, scope=arguments.scope, revision=arguments.revision, caller_roles=arguments.roles)
+        )
+        print(result.model_dump_json())
+        return 0
+    finally:
+        repository.close()
+
+
+def _symbol_explain(arguments: argparse.Namespace) -> int:
+    root = _project_root()
+    result = SymbolService(root / "fixtures/java-microservices").explain(arguments.symbol, arguments.revision)
+    print(result.model_dump_json())
+    return 0
+
+
+def _tests_required(arguments: argparse.Namespace) -> int:
+    catalog = load_catalog(_project_root() / "src/bizguard/semantic/catalog.yaml")
+    result = [item.model_dump() for item in select_required_tests(catalog, arguments.capability, arguments.policy)]
+    print(json.dumps(result, sort_keys=True))
     return 0
 
 

@@ -31,17 +31,20 @@ def _structured_card(result: object) -> dict[str, object]:
 
 
 def test_mcp_tools_are_registered_with_json_schemas() -> None:
-    """FastMCP exposes both read-only adapters with typed input and output schemas."""
+    """Phase 4 exposes the complete typed MCP surface, including the schema-only write gate."""
     tools = asyncio.run(mcp.list_tools())
     by_name = {tool.name: tool for tool in tools}
 
-    assert set(by_name) == {"prepare_change", "validate_patch"}
+    assert set(by_name) == {
+        "prepare_change", "search_team_knowledge", "explain_symbol", "analyze_impact",
+        "validate_patch", "get_required_tests", "request_approval", "get_change_decision",
+    }
     for tool in by_name.values():
-        assert tool.inputSchema["properties"]["diff_text"]["type"] == "string"
+        assert tool.inputSchema["properties"]
         assert tool.outputSchema is not None
-        assert "decision" in tool.outputSchema["properties"]
-        assert "只读" in (tool.description or "")
-        assert "副作用" in (tool.description or "")
+        assert "只读" in (tool.description or "") or tool.name == "request_approval"
+    assert by_name["validate_patch"].inputSchema["properties"]["diff_text"]["type"] == "string"
+    assert by_name["get_change_decision"].inputSchema["properties"]["diff_text"]["type"] == "string"
 
 
 def test_mcp_tool_matches_shared_decision() -> None:

@@ -1,6 +1,8 @@
 """Load-only verifier for the Phase 1 versioned golden benchmark."""
 
 import argparse
+import asyncio
+from hashlib import sha256
 import json
 from pathlib import Path
 from typing import Any, TypeVar
@@ -34,6 +36,7 @@ class Manifest(BaseModel):
     version: int
     suite: str
     tasks: list[ManifestTask]
+    phase4: dict[str, Any] | None = None
 
 
 def verify(manifest_path: Path, suite: str) -> int:
@@ -41,6 +44,8 @@ def verify(manifest_path: Path, suite: str) -> int:
     try:
         if suite == "phase2":
             return _verify_phase2(manifest_path)
+        if suite == "phase4":
+            return _verify_phase4(manifest_path)
         manifest_path = manifest_path.resolve()
         manifest = Manifest.model_validate(
             yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
@@ -69,6 +74,85 @@ def verify(manifest_path: Path, suite: str) -> int:
         f"{len(manifest.tasks)}/{len(manifest.tasks)} {suite} manifest/schema/golden references loaded"
     )
     return 0
+
+
+def _digest(value: object) -> str:
+    """Return the stable digest used by frozen Phase 4 Context Pack goldens."""
+    payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _verify_phase4(manifest_path: Path) -> int:
+    """Recompile the twelve read-only Context Packs and verify MCP contracts."""
+    manifest_path = manifest_path.resolve()
+    root = manifest_path.parent.parent.parent
+    payload = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    suite = payload.get("phase4")
+    if not isinstance(suite, dict):
+        raise ValueError("manifest has no phase4 suite")
+    tasks = suite.get("tasks")
+    if not isinstance(tasks, list) or len(tasks) != 12:
+        raise ValueError("phase4 requires exactly 12 Context Pack tasks")
+
+    from bizguard.context.compiler import ContextCompiler
+
+    compiler = ContextCompiler(root / "fixtures/java-microservices")
+    for task in tasks:
+        if not isinstance(task, dict):
+            raise ValueError("phase4 task must be a mapping")
+        required = {"id", "task", "repos", "base_revisions", "context_sha256", "impact_sha256", "required_tests_sha256"}
+        if not required <= task.keys():
+            raise ValueError(f"phase4 task misses required fields: {task}")
+        pack = compiler.compile(
+            str(task["task"]), list(task["repos"]), dict(task["base_revisions"]), token_budget=2000
+        )
+        actual = (
+            _digest(pack.model_dump(mode="json")),
+            _digest(pack.impact.model_dump(mode="json")),
+            _digest(pack.required_tests),
+        )
+        expected = (task["context_sha256"], task["impact_sha256"], task["required_tests_sha256"])
+        if actual != expected:
+            raise ValueError(f"phase4 golden mismatch: {task['id']}")
+    _verify_phase4_mcp(root, suite)
+    print(f"8 Tool + 16/16 I/O + {len(tasks)}/12 Context Pack matched")
+    return 0
+
+
+def _verify_phase4_mcp(root: Path, suite: dict[str, object]) -> None:
+    """Exercise frozen valid/error examples through the registered MCP adapters."""
+    from agents_mcp.server import mcp
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    expected_names = {
+        "prepare_change", "search_team_knowledge", "explain_symbol", "analyze_impact",
+        "validate_patch", "get_required_tests", "request_approval", "get_change_decision",
+    }
+    tools = asyncio.run(mcp.list_tools())
+    by_name = {tool.name: tool for tool in tools}
+    if set(by_name) != expected_names or any(not tool.inputSchema for tool in by_name.values()):
+        raise ValueError("Phase 4 requires exactly eight typed MCP tools")
+    samples = suite.get("io_samples")
+    if isinstance(samples, str):
+        samples = yaml.safe_load((root / "bench" / samples).read_text(encoding="utf-8"))
+    if not isinstance(samples, list) or len(samples) != 16:
+        raise ValueError("phase4 requires exactly 16 MCP I/O samples")
+    for sample in samples:
+        if not isinstance(sample, dict) or sample.get("tool") not in by_name:
+            raise ValueError("invalid Phase 4 MCP I/O sample")
+        arguments = dict(sample.get("arguments", {}))
+        diff_file = arguments.pop("diff_file", None)
+        if diff_file is not None:
+            arguments["diff_text"] = (root / str(diff_file)).read_text(encoding="utf-8")
+        expects_error = bool(sample.get("error"))
+        try:
+            asyncio.run(mcp.call_tool(str(sample["tool"]), arguments))
+        except (ToolError, ValueError):
+            if not expects_error:
+                raise ValueError(f"valid MCP I/O sample failed: {sample['id']}") from None
+        else:
+            if expects_error:
+                raise ValueError(f"invalid MCP I/O sample unexpectedly succeeded: {sample['id']}")
 
 
 def _verify_phase2(manifest_path: Path) -> int:
