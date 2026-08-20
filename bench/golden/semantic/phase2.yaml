@@ -1,8 +1,8 @@
 version: 1
 tasks:
-  - {id: dto-field, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
-  - {id: ledger, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
-  - {id: state-enum, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
-  - {id: idempotency-key, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
-  - {id: public-api, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
-  - {id: private-method, capability: coupon_redemption, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-core-redeem-idempotency-test, bait_test: merchant-service-coupon-status-test}
+  - {id: dto-field, capability: dto_field_contract, owner: coupon_platform, mandatory_policy: coupon-dto-field-compatibility, required_test: coupon-dto-contract-test, bait_test: coupon-ledger-audit-test}
+  - {id: ledger, capability: redemption_ledger, owner: coupon_platform, mandatory_policy: coupon-ledger-auditability, required_test: coupon-ledger-audit-test, bait_test: coupon-state-enum-test}
+  - {id: state-enum, capability: redemption_state_machine, owner: coupon_platform, mandatory_policy: coupon-state-transition-validity, required_test: coupon-state-enum-test, bait_test: coupon-idempotency-test}
+  - {id: idempotency-key, capability: redemption_idempotency, owner: coupon_platform, mandatory_policy: coupon-redemption-idempotency-key, required_test: coupon-idempotency-test, bait_test: coupon-public-api-test}
+  - {id: public-api, capability: redeem_public_api, owner: coupon_platform, mandatory_policy: coupon-public-api-compatibility, required_test: coupon-public-api-test, bait_test: coupon-private-helper-test}
+  - {id: private-method, capability: private_repository_helper, owner: coupon_platform, mandatory_policy: coupon-private-helper-scope, required_test: coupon-private-helper-test, bait_test: coupon-dto-contract-test}

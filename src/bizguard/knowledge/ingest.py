@@ -10,7 +10,17 @@ import yaml  # type: ignore[import-untyped]
 from bizguard.knowledge.models import KnowledgeEntry, KnowledgeStatus
 from bizguard.knowledge.repository import KnowledgeRepository
 
-_INJECTION = re.compile(r"(?i)(ignore (all |previous )?instructions|system prompt|act as|jailbreak)")
+_INJECTION = re.compile(
+    r"(?i)(?:"
+    r"\bignore (?:all |previous )?instructions\b|"
+    r"\bdisregard all (?:prior )?(?:instructions|directions)\b|"
+    r"\bforget (?:all )?(?:your )?(?:rules|instructions)\b|"
+    r"\bdeveloper[ -]mode\b|"
+    r"\breveal (?:your )?(?:hidden )?(?:system )?prompt\b|"
+    r"\bsystem prompt (?:override|instructions?)\b|"
+    r"\bact as\b|\bjailbreak\b"
+    r")"
+)
 
 
 def ingest_file(path: Path, repository: KnowledgeRepository, generated: bool = False) -> KnowledgeEntry:

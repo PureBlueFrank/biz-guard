@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import math
 import re
+from pathlib import Path
 
 from bizguard.knowledge.models import CandidateTrace, KnowledgeEntry, KnowledgeStatus, SearchRequest, SearchResult
 from bizguard.knowledge.rerank import rerank
 from bizguard.knowledge.repository import KnowledgeRepository
+from bizguard.semantic.models import SemanticCatalog, load_catalog
 
 
 class LocalVectorAdapter:
@@ -22,9 +24,15 @@ class LocalVectorAdapter:
 
 
 class HybridSearch:
-    def __init__(self, repository: KnowledgeRepository, vector: LocalVectorAdapter | None = None) -> None:
+    def __init__(
+        self,
+        repository: KnowledgeRepository,
+        vector: LocalVectorAdapter | None = None,
+        catalog: SemanticCatalog | None = None,
+    ) -> None:
         self._repository = repository
         self._vector = vector
+        self._catalog = catalog or load_catalog(Path(__file__).parents[1] / "semantic" / "catalog.yaml")
 
     def search(self, request: SearchRequest) -> SearchResult:
         bm25 = self._repository.bm25(request.query)
@@ -44,8 +52,23 @@ class HybridSearch:
         selected = [next(entry for entry in eligible if entry.id == identifier) for identifier in ids]
         # Critical policies are scope obligations, not a consequence of their rank.
         # They are injected after the same hard filters but independently of top-k.
-        mandatory = sorted({policy for item in eligible for policy in item.policy_ids if "critical" in policy})
-        return SearchResult(entries=selected, traces=list(traces.values()), mandatory_policy_ids=mandatory, semantic_channel="OK" if self._vector else "UNKNOWN")
+        mandatory = sorted({
+            policy
+            for item in eligible
+            for policy in item.policy_ids
+            if self._policy_severity(policy) == "critical"
+        })
+        return SearchResult(
+            entries=selected,
+            traces=list(traces.values()),
+            mandatory_policy_ids=mandatory,
+            semantic_channel="DEGRADED: offline lexical-vector adapter" if self._vector else "UNKNOWN",
+            embedding_model=self._vector.model if self._vector else None,
+            embedding_cache_version=self._vector.cache_version if self._vector else None,
+        )
+
+    def _policy_severity(self, policy_id: str) -> str | None:
+        return next((policy.severity for policy in self._catalog.policies if policy.id == policy_id), None)
 
 
 def _ineligible(entry: KnowledgeEntry, request: SearchRequest) -> str | None:

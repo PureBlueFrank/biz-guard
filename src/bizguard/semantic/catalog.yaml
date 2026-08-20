@@ -1,8 +1,14 @@
 schema_version: 1
 revision: semantic-seed-v1
 capabilities:
+  - {id: dto_field_contract, name: DTO field contract, owner: coupon_platform, repositories: [coupon-core, coupon-contract]}
+  - {id: redemption_ledger, name: Redemption ledger, owner: coupon_platform, repositories: [coupon-core]}
+  - {id: redemption_state_machine, name: Redemption state machine, owner: coupon_platform, repositories: [coupon-core]}
+  - {id: redemption_idempotency, name: Redemption idempotency, owner: coupon_platform, repositories: [coupon-core]}
+  - {id: redeem_public_api, name: Redeem public API, owner: coupon_platform, repositories: [coupon-core, coupon-contract]}
+  - {id: private_repository_helper, name: Private repository helper, owner: coupon_platform, repositories: [coupon-core]}
   - id: coupon_redemption
-    name: Coupon redemption
+    name: Coupon redemption aggregate
     owner: coupon_platform
     repositories: [coupon-core, merchant-service, coupon-contract]
 owners:
@@ -37,23 +43,41 @@ manual_mapper_edges:
     target_id: db://coupon-core/coupon_redemption#status
     reason: Reflection-based mapping is a manually asserted unknown boundary.
 invariants:
+  - {id: dto-field-compatible, capability: dto_field_contract, owner: coupon_platform, statement: DTO fields remain contract compatible., source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/api/CouponRequest.java}
+  - {id: ledger-auditable, capability: redemption_ledger, owner: coupon_platform, statement: Ledger changes remain auditable., source_id: db://coupon-core/coupon_redemption#status}
+  - {id: state-transitions-valid, capability: redemption_state_machine, owner: coupon_platform, statement: Status transitions use the supported enum., source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/domain/CouponRedemption.java}
+  - {id: idempotency-key-required, capability: redemption_idempotency, owner: coupon_platform, statement: A redemption requires an idempotency key., source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.redeem(CouponRequest)}
+  - {id: public-api-compatible, capability: redeem_public_api, owner: coupon_platform, statement: Public redeem APIs remain compatible., source_id: api://coupon-contract/POST/redeem}
+  - {id: private-helper-contained, capability: private_repository_helper, owner: coupon_platform, statement: Private helper changes remain repository-local., source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/CouponRedemptionRepository.java}
   - id: redeem_idempotency_key_required
     capability: coupon_redemption
     owner: coupon_platform
     statement: A successful redemption consumes exactly one idempotency key.
     source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.redeem(CouponRequest)
 policies:
-  - id: coupon-redemption-idempotency-key
+  - {id: coupon-dto-field-compatibility, capability: dto_field_contract, owner: coupon_platform, invariant: dto-field-compatible, severity: high, mode: blocking}
+  - {id: coupon-ledger-auditability, capability: redemption_ledger, owner: coupon_platform, invariant: ledger-auditable, severity: high, mode: blocking}
+  - {id: coupon-state-transition-validity, capability: redemption_state_machine, owner: coupon_platform, invariant: state-transitions-valid, severity: high, mode: blocking}
+  - {id: coupon-redemption-idempotency-key, capability: redemption_idempotency, owner: coupon_platform, invariant: redeem_idempotency_key_required, severity: critical, mode: blocking}
+  - {id: coupon-public-api-compatibility, capability: redeem_public_api, owner: coupon_platform, invariant: public-api-compatible, severity: high, mode: blocking}
+  - {id: coupon-private-helper-scope, capability: private_repository_helper, owner: coupon_platform, invariant: private-helper-contained, severity: low, mode: advisory}
+  - id: coupon-redemption-aggregate-idempotency-key
     capability: coupon_redemption
     owner: coupon_platform
     invariant: redeem_idempotency_key_required
     severity: critical
     mode: blocking
 required_tests:
+  - {id: coupon-dto-contract-test, capability: dto_field_contract, owner: coupon_platform, policy: coupon-dto-field-compatibility, command: ./mvnw --offline test, repository: coupon-core}
+  - {id: coupon-ledger-audit-test, capability: redemption_ledger, owner: coupon_platform, policy: coupon-ledger-auditability, command: ./mvnw --offline test, repository: coupon-core}
+  - {id: coupon-state-enum-test, capability: redemption_state_machine, owner: coupon_platform, policy: coupon-state-transition-validity, command: ./mvnw --offline test, repository: coupon-core}
+  - {id: coupon-idempotency-test, capability: redemption_idempotency, owner: coupon_platform, policy: coupon-redemption-idempotency-key, command: ./mvnw --offline test, repository: coupon-core}
+  - {id: coupon-public-api-test, capability: redeem_public_api, owner: coupon_platform, policy: coupon-public-api-compatibility, command: ./mvnw --offline test, repository: coupon-contract}
+  - {id: coupon-private-helper-test, capability: private_repository_helper, owner: coupon_platform, policy: coupon-private-helper-scope, command: ./mvnw --offline test, repository: coupon-core}
   - id: coupon-core-redeem-idempotency-test
     capability: coupon_redemption
     owner: coupon_platform
-    policy: coupon-redemption-idempotency-key
+    policy: coupon-redemption-aggregate-idempotency-key
     command: ./mvnw --offline test
     repository: coupon-core
   - id: merchant-service-coupon-status-test

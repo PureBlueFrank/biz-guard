@@ -6,7 +6,7 @@ from bizguard.knowledge.models import CandidateTrace
 
 
 def rerank(scores: dict[str, CandidateTrace]) -> list[CandidateTrace]:
-    """Fuse normalized channel scores; deterministic ID breaks make goldens reproducible."""
+    """Fuse raw BM25 with lexical-vector scores; deterministic IDs break ties reproducibly."""
     for trace in scores.values():
         lexical = trace.bm25_score or 0.0
         semantic = trace.vector_score or 0.0

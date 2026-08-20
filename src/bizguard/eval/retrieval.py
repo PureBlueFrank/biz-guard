@@ -15,7 +15,9 @@ from bizguard.knowledge.repository import KnowledgeRepository
 from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
 
 
-def evaluate(dataset: Path, knowledge_directory: Path | None = None) -> dict[str, Any]:
+def evaluate(
+    dataset: Path, knowledge_directory: Path | None = None, *, strict: bool = True
+) -> dict[str, Any]:
     payload = yaml.safe_load(dataset.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("tasks"), list):
         raise ValueError("retrieval dataset must contain tasks")
@@ -36,22 +38,24 @@ def evaluate(dataset: Path, knowledge_directory: Path | None = None) -> dict[str
                 raise ValueError("task must be a mapping")
             expected = list(task["expected_ids"])
             forbidden = list(task.get("forbidden_ids", []))
-            if not set(expected + forbidden).issubset(known):
+            forbidden_stale = list(task.get("forbidden_stale_ids", []))
+            forbidden_acl = list(task.get("forbidden_acl_ids", []))
+            if not set(expected + forbidden + forbidden_stale + forbidden_acl).issubset(known):
                 raise ValueError(f"task {task.get('id')} references missing knowledge id")
             result = HybridSearch(repo, LocalVectorAdapter()).search(SearchRequest(
                 query=task["query"], caller_roles=task["caller_roles"], scope=task["scope"], revision=task["revision"]
             ))
             actual = [entry.id for entry in result.entries]
-            leaked = set(actual) & set(forbidden)
-            stale_leaks += sum(trace.elimination_reason == "stale" and trace.id in actual for trace in result.traces)
-            acl_leaks += sum(trace.elimination_reason == "acl_denied" and trace.id in actual for trace in result.traces)
+            leaked = set(actual) & set(forbidden + forbidden_stale + forbidden_acl)
+            stale_leaks += len(set(actual) & set(forbidden_stale))
+            acl_leaks += len(set(actual) & set(forbidden_acl))
             required_policy = task.get("mandatory_policy")
             policy_ok = required_policy is None or required_policy in result.mandatory_policy_ids
             policy_hits += int(policy_ok) if required_policy else 0
             record = {"id": task["id"], "expected_ids": expected, "actual_ids": actual, "passed": actual == expected and not leaked and policy_ok}
             records.append(record)
         failures = [record["id"] for record in records if not record["passed"]]
-        if failures:
+        if failures and strict:
             raise ValueError(f"retrieval golden mismatch: {', '.join(failures)}")
         required_count = sum(bool(task.get("mandatory_policy")) for task in tasks)
         return {

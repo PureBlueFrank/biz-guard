@@ -5,7 +5,7 @@ import yaml  # type: ignore[import-untyped]
 
 from bizguard.eval.retrieval import evaluate
 from bizguard.knowledge.ingest import ingest_directory
-from bizguard.knowledge.models import SearchRequest
+from bizguard.knowledge.models import SearchRequest, SearchResult
 from bizguard.knowledge.repository import KnowledgeRepository
 from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
 
@@ -46,3 +46,30 @@ def test_evaluator_rejects_wrong_golden_order(tmp_path: Path) -> None:
     broken.write_text(yaml.safe_dump(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="golden mismatch"):
         evaluate(broken, Path(__file__).parents[1] / "knowledge/published")
+
+
+def test_evaluator_counts_forbidden_acl_and_stale_documents_when_returned(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_search = HybridSearch.search
+
+    def leaking_search(self: HybridSearch, request: SearchRequest) -> SearchResult:
+        result = original_search(self, request)
+        if request.caller_roles == ["public"]:
+            restricted = next(item for item in self._repository.all() if item.id == "restricted-incident")
+            return result.model_copy(update={"entries": [*result.entries, restricted]})
+        if request.query == "legacy ledger":
+            stale = next(item for item in self._repository.all() if item.id == "stale-ledger")
+            return result.model_copy(update={"entries": [*result.entries, stale]})
+        return result
+
+    monkeypatch.setattr(HybridSearch, "search", leaking_search)
+    report = evaluate(Path(__file__).parents[1] / "bench/golden/retrieval/phase2.yaml", strict=False)
+    assert report["acl_leak_count"] > 0
+    assert report["stale_knowledge_rate"] > 0
+
+
+def test_search_reports_embedding_evidence_and_lexical_degradation(search: HybridSearch) -> None:
+    result = search.search(SearchRequest(query="ledger", caller_roles=["engineering"], scope="coupon_redemption", revision="semantic-seed-v1"))
+    assert result.semantic_channel.startswith("DEGRADED:")
+    assert (result.embedding_model, result.embedding_cache_version) == ("embedding-3", "offline-hash-v1")

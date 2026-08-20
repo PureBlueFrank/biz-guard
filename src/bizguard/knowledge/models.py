@@ -74,3 +74,5 @@ class SearchResult(BaseModel):
     traces: list[CandidateTrace]
     mandatory_policy_ids: list[str]
     semantic_channel: str
+    embedding_model: str | None = None
+    embedding_cache_version: str | None = None
