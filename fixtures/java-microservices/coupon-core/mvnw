@@ -1,0 +1,4 @@
+#!/bin/sh
+FIXTURE_PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export FIXTURE_PROJECT_DIR
+exec "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/scripts/compile.sh" "$@"

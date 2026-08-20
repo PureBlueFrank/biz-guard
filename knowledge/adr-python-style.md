@@ -4,6 +4,8 @@ title: Python 样例代码风格
 type: adr
 scope: global
 source: docs/adr/ADR-018.md
+revision: semantic-seed-v1
+source_commit: 4165ccf0fb6b88705b7e6fca4a79aa144d4c1ada
 owner: developer-experience
 policy_ids: []
 ---

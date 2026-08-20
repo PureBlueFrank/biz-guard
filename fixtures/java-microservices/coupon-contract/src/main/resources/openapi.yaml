@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info: {title: Coupon Contract, version: 1.0.0}
+paths:
+  /v1/coupons/redeem:
+    post:
+      operationId: redeemCoupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CouponRequest'}
+      responses:
+        '200':
+          description: redeemed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CouponResponse'}
+components:
+  schemas:
+    CouponRequest:
+      type: object
+      required: [couponCode, idempotencyKey]
+      properties:
+        couponCode: {type: string}
+        idempotencyKey: {type: string}
+    CouponResponse:
+      type: object
+      required: [redemptionId, status]
+      properties:
+        redemptionId: {type: string}
+        status: {type: string}

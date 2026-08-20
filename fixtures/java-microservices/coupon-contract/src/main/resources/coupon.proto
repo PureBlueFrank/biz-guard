@@ -1,0 +1,5 @@
+syntax = "proto3";
+package coupon.v1;
+service CouponService { rpc Redeem (RedeemRequest) returns (RedeemResponse); }
+message RedeemRequest { string coupon_code = 1; string idempotency_key = 2; }
+message RedeemResponse { string redemption_id = 1; string status = 2; }

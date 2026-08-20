@@ -1,0 +1,64 @@
+schema_version: 1
+revision: semantic-seed-v1
+capabilities:
+  - id: coupon_redemption
+    name: Coupon redemption
+    owner: coupon_platform
+    repositories: [coupon-core, merchant-service, coupon-contract]
+owners:
+  - id: coupon_platform
+    name: Coupon Platform
+    repositories: [coupon-core, coupon-contract]
+  - id: merchant_checkout
+    name: Merchant Checkout
+    repositories: [merchant-service]
+entities:
+  - id: coupon_redemption_record
+    capability: coupon_redemption
+    repository: coupon-core
+    canonical_id: db://coupon-core/coupon_redemption#idempotency_key
+  - id: coupon_redemption_ledger
+    capability: coupon_redemption
+    repository: coupon-core
+    canonical_id: db://coupon-core/coupon_redemption#status
+states:
+  - id: redemption_pending
+    entity: coupon_redemption_record
+    value: PENDING
+  - id: redemption_succeeded
+    entity: coupon_redemption_record
+    value: SUCCEEDED
+  - id: redemption_failed
+    entity: coupon_redemption_ledger
+    value: FAILED
+manual_mapper_edges:
+  - id: coupon-redemption-dynamic-mapper
+    source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java#DynamicCouponMapper.map(java.util.Map)
+    target_id: db://coupon-core/coupon_redemption#status
+    reason: Reflection-based mapping is a manually asserted unknown boundary.
+invariants:
+  - id: redeem_idempotency_key_required
+    capability: coupon_redemption
+    owner: coupon_platform
+    statement: A successful redemption consumes exactly one idempotency key.
+    source_id: repo://coupon-core/src/main/java/com/bizguard/coupon/application/RedeemService.java#RedeemService.redeem(CouponRequest)
+policies:
+  - id: coupon-redemption-idempotency-key
+    capability: coupon_redemption
+    owner: coupon_platform
+    invariant: redeem_idempotency_key_required
+    severity: critical
+    mode: blocking
+required_tests:
+  - id: coupon-core-redeem-idempotency-test
+    capability: coupon_redemption
+    owner: coupon_platform
+    policy: coupon-redemption-idempotency-key
+    command: ./mvnw --offline test
+    repository: coupon-core
+  - id: merchant-service-coupon-status-test
+    capability: coupon_redemption
+    owner: merchant_checkout
+    policy: coupon-redemption-idempotency-key
+    command: ./mvnw --offline test
+    repository: merchant-service

@@ -46,6 +46,8 @@ class KnowledgeFrontMatter(BaseModel):
     type: str
     scope: str
     source: str
+    revision: str
+    source_commit: str
     owner: str
     policy_ids: list[str]
 

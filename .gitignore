@@ -11,3 +11,4 @@ dist/
 .cache/
 embedding_cache/
 *.embedding-cache
+fixtures/java-microservices/*/target/
