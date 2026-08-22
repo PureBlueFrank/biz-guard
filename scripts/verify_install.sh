@@ -121,10 +121,17 @@ async def verify() -> dict[str, object]:
 print(json.dumps(asyncio.run(verify()), sort_keys=True))
 PY
 
+set +e
 ci_output=$("$PYTHON_BIN" -m bizguard.ci.check \
   --diff "$fixture" \
   --base-revisions "$PROJECT_ROOT/bench/fixtures/phase3-revisions.yaml" \
   --json)
+ci_code=$?
+set -e
+if [ "$ci_code" -ne 1 ]; then
+  echo "CI gate returned exit code $ci_code (expected 1 for unapproved REQUIRE_APPROVAL)" >&2
+  exit 1
+fi
 "$PYTHON_BIN" - "$ci_output" <<'PY'
 import json
 import sys

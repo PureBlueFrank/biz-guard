@@ -99,10 +99,17 @@ missing_diff="$PROJECT_ROOT/sample/diffs/does-not-exist.diff"
 expect_check 2 CHECK_INCOMPLETE "$missing_diff"
 
 printf '\n%s\n' '场景 5：动态映射未知边界（预期 REQUIRE_APPROVAL）'
+set +e
 dynamic_output=$(cd "$PROJECT_ROOT" && "$PYTHON_BIN" -m bizguard.ci.check \
     --diff bench/fixtures/phase5/dynamic-mapper.diff \
     --base-revisions bench/fixtures/phase3-revisions.yaml \
     --json)
+dynamic_code=$?
+set -e
+if [ "$dynamic_code" -ne 1 ]; then
+    printf '%s\n' "演示失败：期望门禁退出码 1，实际为 $dynamic_code" >&2
+    exit 1
+fi
 "$PYTHON_BIN" - "$dynamic_output" <<'PY'
 import json
 import sys

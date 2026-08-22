@@ -1,5 +1,7 @@
 name: bizguard
 on: [pull_request]
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -12,3 +14,47 @@ jobs:
       - run: python -m ruff check --select D101,D103 src/bizguard agents_mcp
       - run: python -m mypy src tests agents_mcp
       - run: python -m pytest -q
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -e .[dev]
+      - name: Generate PR diff and base revisions
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.sha }}" --depth=1
+          git diff "${{ github.event.pull_request.base.sha }}" HEAD > /tmp/pr.diff
+          printf 'revision: %s\n' "${{ github.event.pull_request.base.sha }}" > /tmp/base-revisions.yaml
+      - name: BizGuard safety gate
+        id: gate
+        run: |
+          set +e
+          python -m bizguard.ci.check \
+            --diff /tmp/pr.diff \
+            --base-revisions /tmp/base-revisions.yaml \
+            --repository-root . \
+            --json > /tmp/bizguard-result.json
+          code=$?
+          set -e
+          {
+            echo "## BizGuard decision"
+            python - /tmp/bizguard-result.json <<'PY'
+import json
+import sys
+payload = json.load(open(sys.argv[1]))
+print(f"- decision: `{payload.get('decision')}`")
+print(f"- rationale: {payload.get('rationale')}")
+print(f"- required approvers: {payload.get('required_approvers')}")
+print(f"- evidence: {payload.get('evidence')}")
+for test in payload.get("required_tests", []):
+    print(f"- required test: {test.get('id')}")
+for finding in payload.get("findings", []):
+    print(f"- finding: {finding.get('id')} -> {finding.get('effect')}")
+PY
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
