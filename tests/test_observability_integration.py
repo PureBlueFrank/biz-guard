@@ -20,7 +20,13 @@ def test_audit_events_reconstruct_in_order_by_context(tmp_path: Path) -> None:
     store = SqliteApprovalStore(tmp_path / "approvals.db")
     service = ApprovalService(store=store)
     request = service.create(
-        ApprovalRequest(change_context_id="ctx", policy_revision="r", approvers=("a",), required_cosigns=1)
+        ApprovalRequest(
+            change_context_id="ctx",
+            policy_revision="r",
+            decision_fingerprint="a" * 64,
+            approvers=("a",),
+            required_cosigns=1,
+        )
     )
     service.request_evidence(request, "need test")
     service.add_evidence(request, "test://run")
@@ -73,10 +79,19 @@ def test_metrics_export_percentiles_distribution_and_unknown_rate() -> None:
 
 def test_evaluator_propagates_provided_trace_id() -> None:
     diff = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1,1 +1,1 @@\n-a\n+b\n"
-    decision = ChangeEvaluator(REPOSITORY_ROOT).evaluate(
+    audit = AuditTrail()
+    records: list[dict[str, object]] = []
+    evaluator = ChangeEvaluator(REPOSITORY_ROOT, audit=audit, metric_records=records)
+    decision = evaluator.evaluate(
         EvaluationRequest(diff_text=diff, repository_root=REPOSITORY_ROOT, trace_id="trace-42")
     )
     assert decision.trace_id == "trace-42"
+    assert audit.events[0].action == "change_evaluated"
+    assert audit.events[0].trace_id == "trace-42"
+    assert audit.events[0].details["decision"] == decision.decision.value
+    assert records[0]["decision"] == decision.decision.value
+    duration = records[0]["duration_ms"]
+    assert isinstance(duration, (int, float)) and duration > 0
 
 
 def test_evaluator_leaves_trace_id_none_when_absent() -> None:

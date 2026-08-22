@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import asyncio
 import json
 from pathlib import Path
 import subprocess
@@ -11,7 +12,7 @@ from typing import Any
 import pytest
 
 import scripts.codex_agent as agent
-from bizguard.decision import evaluate_change
+from agents_mcp.server import mcp
 
 
 ROOT = Path(__file__).parents[1]
@@ -24,9 +25,12 @@ def _codex_stdout(
     call_diff: str | None = None,
     final_decision: str = "block",
 ) -> str:
-    tool_output = evaluate_change(diff_text if call_diff is None else call_diff).model_dump(
-        mode="json"
-    )
+    arguments = {
+        "diff_text": diff_text if call_diff is None else call_diff,
+    }
+    result = asyncio.run(mcp.call_tool("get_change_decision", arguments))
+    assert isinstance(result, tuple) and isinstance(result[1], dict)
+    tool_output = result[1]
     events = [
         {"type": "thread.started", "thread_id": "codex-thread-1"},
         {"type": "turn.started"},
@@ -36,8 +40,8 @@ def _codex_stdout(
                 "id": "item-1",
                 "type": "mcp_tool_call",
                 "server": "bizguard",
-                "tool": "validate_patch",
-                "arguments": {"diff_text": diff_text if call_diff is None else call_diff},
+                "tool": "get_change_decision",
+                "arguments": arguments,
                 "status": "completed",
                 "error": None,
                 "result": {
@@ -87,7 +91,7 @@ def test_live_agent_launches_codex_with_real_stdio_mcp_config(
     assert "--json" in command
     assert command[command.index("--sandbox") + 1] == "read-only"
     assert "mcp_servers.bizguard.required=true" in command
-    assert 'mcp_servers.bizguard.enabled_tools=["validate_patch"]' in command
+    assert 'mcp_servers.bizguard.enabled_tools=["get_change_decision"]' in command
     assert transcript["track"] == "live"
     assert transcript["agent"] == "codex-cli"
     assert transcript["model"] == "codex-test-model"

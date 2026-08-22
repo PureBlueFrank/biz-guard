@@ -19,7 +19,7 @@ DYNAMIC_EVIDENCE = f"impact:DYNAMIC_BOUNDARY:{DYNAMIC_SYMBOL}"
 
 
 def test_ci_recomputes_expected_public_contract_decision() -> None:
-    assert evaluate(FIXTURE.read_text(encoding="utf-8"))["decision"] == "REQUIRE_APPROVAL"
+    assert evaluate(FIXTURE.read_text(encoding="utf-8"))["decision"] == "ALLOW_WITH_TESTS"
 
 
 def test_ci_subprocess_matches_in_process() -> None:

@@ -10,6 +10,15 @@ from bizguard.decision.v2 import DecisionState, FindingV2
 from bizguard.semantic.models import CatalogRequiredTest
 
 
+class TestEvidence(BaseModel):
+    """Record one revision-bound test result supplied by a trusted runner."""
+
+    test_id: str
+    passed: bool
+    revision: str
+    evidence_uri: str
+
+
 class EvaluationRequest(BaseModel):
     """The only input shape accepted by the canonical change evaluator."""
 
@@ -18,7 +27,8 @@ class EvaluationRequest(BaseModel):
     base_revisions: dict[str, object] = Field(default_factory=dict)
     policy_revision: str = "phase5"
     principal: str = "engineering"
-    tests_passed: bool | None = True
+    tests_passed: bool | None = None
+    test_evidence: list[TestEvidence] = Field(default_factory=list)
     change_context_id: str | None = None
     trace_id: str | None = None
 
@@ -36,5 +46,6 @@ class ChangeDecision(BaseModel):
     change_context_id: str | None = None
     policy_revision: str
     base_revisions_sha256: str
+    decision_fingerprint: str
     approval_state: str | None = None
     trace_id: str | None = None

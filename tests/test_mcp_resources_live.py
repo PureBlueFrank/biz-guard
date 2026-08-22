@@ -65,27 +65,43 @@ def test_evidence_resource_reads_from_knowledge_store() -> None:
     assert payload["evidence_links"]
 
 
+def test_evidence_resource_enforces_server_authenticated_acl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "engineering")
+    with pytest.raises((ValueError, ResourceError), match="resource unavailable"):
+        _read("bizguard://evidence/restricted-incident")
+
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "security")
+    payload = _read("bizguard://evidence/restricted-incident")
+    assert payload["id"] == "restricted-incident"
+
+
 def test_change_resource_reads_from_persisted_store(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import agents_mcp.server as server
 
-    monkeypatch.setenv("BIZGUARD_APPROVAL_DB", str(tmp_path / "approvals.sqlite3"))
-    monkeypatch.setattr(server, "_approval_store", None)
-    asyncio.run(
+    monkeypatch.setenv("BIZGUARD_CONTEXT_DB", str(tmp_path / "contexts.sqlite3"))
+    monkeypatch.setattr(server, "_change_store", None)
+    prepared = asyncio.run(
         mcp.call_tool(
-            "request_approval",
+            "prepare_change",
             {
-                "change_context_id": "ctx-res",
-                "policy_revision": "phase5",
-                "approvers": ["coupon_platform"],
-                "required_cosigns": 1,
+                "task": "status",
+                "repos": ["coupon-core"],
+                "base_revisions": {
+                    "coupon-core": "fixture-coupon-core-base",
+                    "__index__": "phase3-fixture-v1",
+                },
             },
         )
     )
-    payload = _read("bizguard://changes/ctx-res")
-    assert payload["change_context_id"] == "ctx-res"
-    assert payload["summary"] == "pending"
+    assert isinstance(prepared, tuple) and isinstance(prepared[1], dict)
+    context_id = str(prepared[1]["change_context_id"])
+    payload = _read(f"bizguard://changes/{context_id}")
+    assert payload["change_context_id"] == context_id
+    assert payload["summary"] == "status"
 
 
 def test_missing_resource_returns_error_without_extra_information() -> None:

@@ -16,7 +16,7 @@ from bizguard.decision import (
     FindingStatus,
 )
 from bizguard.change.evaluator import ChangeEvaluator
-from bizguard.change.models import ChangeDecision, EvaluationRequest
+from bizguard.change.models import ChangeDecision, EvaluationRequest, TestEvidence
 from bizguard.connectors import connect
 from bizguard.decision.v2 import DecisionState
 from bizguard.context.compiler import ContextCompiler, ContextPack
@@ -37,6 +37,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_parser.add_argument("--diff", type=Path, required=True)
     check_parser.add_argument("--repository-root", type=Path, default=None)
     check_parser.add_argument("--base-revisions", type=Path, default=None)
+    check_parser.add_argument("--tests-complete", action="store_true")
+    check_parser.add_argument("--test-evidence", type=Path)
+    check_parser.add_argument("--change-context-id")
+    check_parser.add_argument("--approval-db", type=Path)
     doctor_parser = subparsers.add_parser("doctor")
     doctor_parser.add_argument("--json", action="store_true")
     doctor_parser.add_argument("--repository", type=Path, default=None)
@@ -86,6 +90,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     connect_parser.add_argument("agent", choices=["claude-code", "codex"])
     connect_parser.add_argument("--repository", type=Path, default=None)
     connect_parser.add_argument("--dry-run", action="store_true")
+    connect_parser.add_argument("--identity")
+    connect_parser.add_argument("--roles", nargs="+")
     verify_parser = subparsers.add_parser("verify-install")
     verify_parser.add_argument("--repository", type=Path, default=None)
     verify_parser.add_argument("--offline", action="store_true")
@@ -130,7 +136,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_card(_invalid_input_card("无法读取 diff 文件。", [str(diff_path)]))
         return 2
 
-    result = _evaluate_change(arguments, diff_text)
+    try:
+        result = _evaluate_change(arguments, diff_text)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"invalid evaluation evidence: {exc}", file=sys.stderr)
+        return 2
     print(result.model_dump_json())
     return _exit_code_v4(result)
 
@@ -202,7 +212,7 @@ def _check_graph(root: Path) -> str:
 
 def _check_agent_config(root: Path) -> str:
     has_claude = (root / ".claude" / "settings.json").is_file()
-    has_codex = (root / ".codex").is_dir()
+    has_codex = _codex_mcp_registered()
     return "ok" if has_claude or has_codex else "degraded"
 
 
@@ -257,14 +267,34 @@ def _detect_agent_config(root: Path) -> list[str]:
     found = []
     if (root / ".claude" / "settings.json").is_file():
         found.append("claude-code")
-    if (root / ".codex").is_dir():
+    if _codex_mcp_registered():
         found.append("codex")
     return found
 
 
+def _codex_mcp_registered() -> bool:
+    """Ask Codex itself whether the supported BizGuard MCP entry exists."""
+    try:
+        result = subprocess.run(
+            ["codex", "mcp", "get", "bizguard", "--json"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
+
+
 def _connect(arguments: argparse.Namespace) -> int:
     root = arguments.repository or Path.cwd()
-    result = connect(arguments.agent, root, dry_run=arguments.dry_run)
+    result = connect(
+        arguments.agent,
+        root,
+        dry_run=arguments.dry_run,
+        identity=arguments.identity,
+        roles=arguments.roles,
+    )
     print(json.dumps(result, sort_keys=True))
     return 0
 
@@ -393,13 +423,29 @@ def _evaluate_change(arguments: argparse.Namespace, diff_text: str) -> ChangeDec
         raw = yaml.safe_load(arguments.base_revisions.read_text(encoding="utf-8")) or {}
         if isinstance(raw, dict):
             base_revisions = raw
-    return ChangeEvaluator(root).evaluate(
-        EvaluationRequest(
-            diff_text=diff_text,
-            repository_root=root,
-            base_revisions=base_revisions,
+    evidence: list[TestEvidence] = []
+    if arguments.test_evidence is not None:
+        raw_evidence = json.loads(arguments.test_evidence.read_text(encoding="utf-8"))
+        if not isinstance(raw_evidence, list):
+            raise ValueError("test evidence must be a JSON list")
+        evidence = [TestEvidence.model_validate(item) for item in raw_evidence]
+    from bizguard.workflow.store import SqliteApprovalStore
+
+    store = SqliteApprovalStore(arguments.approval_db) if arguments.approval_db else None
+    try:
+        return ChangeEvaluator(root, approval_store=store).evaluate(
+            EvaluationRequest(
+                diff_text=diff_text,
+                repository_root=root,
+                base_revisions=base_revisions,
+                tests_passed=True if arguments.tests_complete else None,
+                test_evidence=evidence,
+                change_context_id=arguments.change_context_id,
+            )
         )
-    )
+    finally:
+        if store is not None:
+            store.close()
 
 
 def _exit_code(card: ChangeSafetyCard) -> int:

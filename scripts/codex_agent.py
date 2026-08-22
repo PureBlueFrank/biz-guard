@@ -22,8 +22,13 @@ import yaml  # type: ignore[import-untyped]
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 DEFAULT_DATASET = ROOT / "bench/ablations/tasks.yaml"
-MCP_TOOL_NAME = "bizguard.validate_patch"
-_DECISIONS = {"ALLOW": "allow", "BLOCK": "block", "CHECK_INCOMPLETE": "approval"}
+MCP_TOOL_NAME = "bizguard.get_change_decision"
+_DECISIONS = {
+    "ALLOW": "allow",
+    "ALLOW_WITH_TESTS": "tests",
+    "REQUIRE_APPROVAL": "approval",
+    "BLOCK": "block",
+}
 _OUTPUT_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
@@ -57,10 +62,11 @@ def _prompt(task: dict[str, Any], diff_path: Path, diff_text: str) -> str:
     """Build a frozen prompt that requires one exact BizGuard MCP call."""
     return (
         "This is a read-only benchmark run. Evaluate the local fixture below. You MUST call "
-        "the bizguard MCP server's validate_patch tool exactly once with the complete, "
+        "the bizguard MCP server's get_change_decision tool exactly once with the complete, "
         "unmodified diff as diff_text. Do not invoke BizGuard through the shell and do not "
         "modify files. After the MCP result, return only the requested JSON decision. Map "
-        "ALLOW to allow, BLOCK to block, and CHECK_INCOMPLETE to approval.\n\n"
+        "ALLOW to allow, ALLOW_WITH_TESTS to tests, REQUIRE_APPROVAL to approval, and BLOCK "
+        "to block.\n\n"
         f"Task ID: {task['id']}\nTask: {task['prompt']}\nFixture: {diff_path}\n"
         f"Diff SHA-256: {sha256(diff_text.encode()).hexdigest()}\n"
         f"<frozen_diff>\n{diff_text}</frozen_diff>"
@@ -100,7 +106,7 @@ def _codex_command(
         "-c",
         "mcp_servers.bizguard.required=true",
         "-c",
-        'mcp_servers.bizguard.enabled_tools=["validate_patch"]',
+        'mcp_servers.bizguard.enabled_tools=["get_change_decision"]',
     ]
     if model:
         command.extend(["--model", model])
@@ -152,7 +158,7 @@ def _replay_tool_call(call: dict[str, Any]) -> None:
     if not isinstance(arguments, dict) or not isinstance(output, dict):
         raise ValueError("Codex transcript has no replayable MCP call")
     try:
-        result = asyncio.run(mcp.call_tool("validate_patch", arguments))
+        result = asyncio.run(mcp.call_tool("get_change_decision", arguments))
     except (ToolError, ValueError) as exc:
         raise ValueError("Codex MCP call fails FastMCP schema replay") from exc
     if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], dict):
@@ -192,7 +198,7 @@ def _parse_events(stdout: str, diff_text: str) -> tuple[str, dict[str, Any], dic
     call = calls[0]
     server = call.get("server") or call.get("server_name")
     tool = call.get("tool") or call.get("tool_name")
-    if server != "bizguard" or tool != "validate_patch":
+    if server != "bizguard" or tool != "get_change_decision":
         raise ValueError("Codex selected an unsupported MCP tool")
     if call.get("status") != "completed" or call.get("error") is not None:
         raise ValueError("Codex MCP tool call did not complete successfully")
@@ -257,7 +263,13 @@ def run_live_agent(
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("Codex live-agent run timed out") from exc
         except subprocess.CalledProcessError as exc:
-            raise RuntimeError(f"Codex live-agent run failed with exit code {exc.returncode}") from exc
+            diagnostic = (exc.stderr or "").strip()
+            if len(diagnostic) > 2000:
+                diagnostic = diagnostic[-2000:]
+            suffix = f": {diagnostic}" if diagnostic else ""
+            raise RuntimeError(
+                f"Codex live-agent run failed with exit code {exc.returncode}{suffix}"
+            ) from exc
     thread_id, tool_call, metadata = _parse_events(completed.stdout, diff_text)
     _replay_tool_call(tool_call)
     final = cast(dict[str, Any], metadata.pop("final"))

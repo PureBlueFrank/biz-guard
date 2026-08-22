@@ -16,6 +16,7 @@ def _request(change_context_id: str = "ctx-1") -> ApprovalRequest:
     return ApprovalRequest(
         change_context_id=change_context_id,
         policy_revision="phase5",
+        decision_fingerprint="a" * 64,
         approvers=("a", "b"),
         required_cosigns=2,
     )
@@ -58,15 +59,84 @@ def test_duplicate_request_yields_a_single_approval_record(tmp_path: Path) -> No
     reopened.close()
 
 
-def test_gate_blocks_before_approval_and_releases_after() -> None:
+def test_gate_blocks_before_approval_and_releases_after(tmp_path: Path) -> None:
     diff = (Path(__file__).parents[1] / "bench/fixtures/phase5/dynamic-mapper.diff").read_text(encoding="utf-8")
     root = Path(__file__).parents[1] / "fixtures" / "java-microservices"
-    decision = ChangeEvaluator(root).evaluate(
-        EvaluationRequest(diff_text=diff, repository_root=root)
+    store = SqliteApprovalStore(tmp_path / "approvals.sqlite3")
+    evaluator = ChangeEvaluator(root, approval_store=store)
+    before = evaluator.evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=root, tests_passed=True)
     )
-    assert decision.decision.value == "REQUIRE_APPROVAL"
-    assert gate_exit_code(decision.decision.value) == 1
-    assert gate_exit_code(decision.decision.value, approved=True) == 0
+    assert before.decision.value == "REQUIRE_APPROVAL"
+    assert gate_exit_code(before.decision.value) == 1
+
+    service = ApprovalService(store=store)
+    request = service.create(
+        ApprovalRequest(
+            change_context_id="ctx-approved",
+            policy_revision="phase5",
+            decision_fingerprint=before.decision_fingerprint,
+            approvers=("coupon_platform",),
+            required_cosigns=1,
+        )
+    )
+    service.approve(request, "coupon_platform")
+    after = evaluator.evaluate(
+        EvaluationRequest(
+            diff_text=diff,
+            repository_root=root,
+            tests_passed=True,
+            change_context_id="ctx-approved",
+        )
+    )
+    assert after.decision.value == "ALLOW"
+    assert after.approval_state == "approved"
+    assert gate_exit_code(after.decision.value) == 0
+    store.close()
+
+
+def test_approval_for_an_old_diff_cannot_release_a_new_diff(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1] / "fixtures/java-microservices"
+    dynamic = (Path(__file__).parents[1] / "bench/fixtures/phase5/dynamic-mapper.diff").read_text(
+        encoding="utf-8"
+    )
+    other = dynamic.replace("mapStatus", "mapResult")
+    store = SqliteApprovalStore(tmp_path / "approvals.sqlite3")
+    evaluator = ChangeEvaluator(root, approval_store=store)
+    before = evaluator.evaluate(
+        EvaluationRequest(diff_text=dynamic, repository_root=root, tests_passed=True)
+    )
+    request = ApprovalService(store=store).create(
+        ApprovalRequest(
+            change_context_id="ctx-replay",
+            policy_revision="phase5",
+            decision_fingerprint=before.decision_fingerprint,
+            approvers=("coupon_platform",),
+            required_cosigns=1,
+        )
+    )
+    ApprovalService(store=store).approve(request, "coupon_platform")
+    replay = evaluator.evaluate(
+        EvaluationRequest(
+            diff_text=other,
+            repository_root=root,
+            tests_passed=True,
+            change_context_id="ctx-replay",
+        )
+    )
+    assert replay.decision.value == "REQUIRE_APPROVAL"
+    assert replay.approval_state == "fingerprint_mismatch"
+    store.close()
+
+
+def test_delegate_and_original_share_one_cosign_slot() -> None:
+    service = ApprovalService()
+    request = service.create(_request())
+    service.delegate(request, "a", "delegate-a")
+    service.approve(request, "a")
+    service.approve(request, "delegate-a")
+    assert request.approvals == {"a"}
+    assert request.state is ApprovalState.PENDING
 
 
 def test_evidence_refs_and_updated_at_are_persisted(tmp_path: Path) -> None:

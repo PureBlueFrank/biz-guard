@@ -8,8 +8,13 @@ import subprocess
 import sys
 
 import pytest
+import yaml  # type: ignore[import-untyped]
 
+from bizguard.change.evaluator import ChangeEvaluator
+from bizguard.change.models import EvaluationRequest
 from bizguard.ci.check import gate_exit_code
+from bizguard.workflow.approval import ApprovalRequest, ApprovalService
+from bizguard.workflow.store import SqliteApprovalStore
 
 
 ROOT = Path(__file__).parents[1]
@@ -17,26 +22,27 @@ REVISIONS = ROOT / "bench" / "fixtures" / "phase3-revisions.yaml"
 
 
 @pytest.mark.parametrize(
-    ("decision", "tests_complete", "approved", "expected"),
+    ("decision", "expected"),
     [
-        ("ALLOW", False, False, 0),
-        ("ALLOW_WITH_TESTS", True, False, 0),
-        ("ALLOW_WITH_TESTS", False, False, 1),
-        ("REQUIRE_APPROVAL", False, True, 0),
-        ("REQUIRE_APPROVAL", False, False, 1),
-        ("BLOCK", False, False, 1),
-        ("UNKNOWN", False, False, 2),
+        ("ALLOW", 0),
+        ("ALLOW_WITH_TESTS", 1),
+        ("REQUIRE_APPROVAL", 1),
+        ("BLOCK", 1),
+        ("UNKNOWN", 2),
     ],
 )
-def test_gate_exit_code_contract(
-    decision: str, tests_complete: bool, approved: bool, expected: int
-) -> None:
-    assert gate_exit_code(decision, tests_complete=tests_complete, approved=approved) == expected
+def test_gate_exit_code_contract(decision: str, expected: int) -> None:
+    assert gate_exit_code(decision) == expected
 
 
-def _run_gate(diff_path: Path, revisions: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_gate(
+    diff_path: Path,
+    revisions: Path | None = None,
+    *extra: str,
+) -> subprocess.CompletedProcess[str]:
     args = [sys.executable, "-m", "bizguard.ci.check", "--diff", str(diff_path)]
     args += ["--base-revisions", str(revisions or REVISIONS)]
+    args += list(extra)
     args += ["--json"]
     return subprocess.run(args, cwd=ROOT, capture_output=True, text=True, check=False)
 
@@ -50,9 +56,58 @@ def test_block_fixture_returns_exit_one() -> None:
 
 def test_unapproved_approval_fixture_returns_non_zero() -> None:
     diff = ROOT / "bench" / "fixtures" / "phase5" / "dynamic-mapper.diff"
-    completed = _run_gate(diff)
+    completed = _run_gate(diff, None, "--tests-complete")
     assert completed.returncode == 1
     assert json.loads(completed.stdout)["decision"] == "REQUIRE_APPROVAL"
+
+
+def test_missing_test_evidence_never_becomes_allow() -> None:
+    diff = ROOT / "sample" / "diffs" / "diff_normal_1.diff"
+    completed = _run_gate(diff)
+    assert completed.returncode == 1
+    assert json.loads(completed.stdout)["decision"] == "ALLOW_WITH_TESTS"
+
+
+def test_persisted_approval_releases_the_real_ci_decision(tmp_path: Path) -> None:
+    diff = ROOT / "bench" / "fixtures" / "phase5" / "dynamic-mapper.diff"
+    approval_db = tmp_path / "approvals.sqlite3"
+    store = SqliteApprovalStore(approval_db)
+    root = ROOT / "fixtures/java-microservices"
+    pending = ChangeEvaluator(root).evaluate(
+        EvaluationRequest(
+            diff_text=diff.read_text(encoding="utf-8"),
+            repository_root=root,
+            base_revisions=yaml.safe_load(REVISIONS.read_text(encoding="utf-8")),
+            tests_passed=True,
+        )
+    )
+    request = ApprovalService(store=store).create(
+        ApprovalRequest(
+            change_context_id="ctx-ci-approved",
+            policy_revision="phase5",
+            decision_fingerprint=pending.decision_fingerprint,
+            approvers=("coupon_platform",),
+            required_cosigns=1,
+        )
+    )
+    ApprovalService(store=store).approve(request, "coupon_platform")
+    store.close()
+
+    completed = _run_gate(
+        diff,
+        None,
+        "--tests-complete",
+        "--change-context-id",
+        "ctx-ci-approved",
+        "--approval-db",
+        str(approval_db),
+        "--repository-root",
+        str(root),
+    )
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["decision"] == "ALLOW"
+    assert payload["approval_state"] == "approved"
 
 
 def test_multi_file_violation_in_second_file_fails(tmp_path: Path) -> None:
@@ -91,3 +146,56 @@ def test_unparsable_diff_never_passes(tmp_path: Path) -> None:
     diff_path.write_text("this is not a unified diff\n", encoding="utf-8")
     completed = _run_gate(diff_path)
     assert completed.returncode != 0
+
+
+def test_malformed_test_evidence_fails_closed_without_traceback(tmp_path: Path) -> None:
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text("{not-json", encoding="utf-8")
+    diff = ROOT / "sample/diffs/diff_normal_1.diff"
+    completed = _run_gate(diff, None, "--test-evidence", str(evidence))
+    assert completed.returncode == 2
+    assert "Traceback" not in completed.stderr
+
+
+def test_revision_bound_test_evidence_releases_only_the_matching_change(tmp_path: Path) -> None:
+    diff = ROOT / "sample/diffs/diff_normal_1.diff"
+    evidence = tmp_path / "evidence.json"
+    payload = [
+        {
+            "test_id": test_id,
+            "passed": True,
+            "revision": "phase3-fixture-v1",
+            "evidence_uri": f"ci://run/{test_id}",
+        }
+        for test_id in (
+            "coupon-core-redeem-idempotency-test",
+            "merchant-service-coupon-status-test",
+        )
+    ]
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+    matching = _run_gate(diff, None, "--test-evidence", str(evidence))
+    assert matching.returncode == 0
+    assert json.loads(matching.stdout)["decision"] == "ALLOW"
+
+    payload[0]["revision"] = "different-revision"
+    evidence.write_text(json.dumps(payload), encoding="utf-8")
+    stale = _run_gate(diff, None, "--test-evidence", str(evidence))
+    assert stale.returncode == 1
+    assert json.loads(stale.stdout)["decision"] == "ALLOW_WITH_TESTS"
+
+
+def test_ci_writes_metadata_only_audit_record(tmp_path: Path) -> None:
+    audit = tmp_path / "audit.jsonl"
+    diff = ROOT / "sample/diffs/diff_normal_1.diff"
+    completed = _run_gate(
+        diff,
+        None,
+        "--tests-complete",
+        "--audit-log",
+        str(audit),
+    )
+    assert completed.returncode == 0
+    record = json.loads(audit.read_text(encoding="utf-8"))
+    assert record["event"] == "ci_decision"
+    assert record["details"]["decision"] == "ALLOW"
+    assert "diff_text" not in record["details"]

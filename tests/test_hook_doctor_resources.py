@@ -10,7 +10,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_hook_delegates_to_recomputation() -> None:
     result = validate((ROOT / "bench/fixtures/phase5/cross-service-dto-breaking.diff").read_text(encoding="utf-8"))
-    assert result.decision.value == "REQUIRE_APPROVAL"
+    assert result.decision.value == "ALLOW_WITH_TESTS"
 
 
 def test_install_writes_local_manifest(tmp_path: Path) -> None:

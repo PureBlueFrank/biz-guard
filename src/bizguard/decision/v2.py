@@ -44,6 +44,7 @@ class DecisionInput(BaseModel):
     version_known: bool = True
     risk_score: float | None = Field(default=None, ge=0.0)
     approval_threshold: float = Field(default=0.7, ge=0.0)
+    approval_satisfied: bool = False
 
 
 class DecisionResult(BaseModel):
@@ -64,14 +65,14 @@ def decide(data: DecisionInput) -> DecisionResult:
     if critical:
         return _result(DecisionState.BLOCK, "critical policy violation", data, critical)
     unknown = [item for item in data.findings if item.critical_unknown]
-    if unknown or not data.version_known:
+    if (unknown or not data.version_known) and not data.approval_satisfied:
         return _result(DecisionState.REQUIRE_APPROVAL, "critical boundary or version is unknown", data, unknown)
     if data.required_tests and data.tests_passed is not True:
         return _result(DecisionState.ALLOW_WITH_TESTS, "required test evidence is missing", data, [])
     public = [item for item in data.findings if item.public_contract]
-    if public or len(set(data.owners)) > 1:
+    if (public or len(set(data.owners)) > 1) and not data.approval_satisfied:
         return _result(DecisionState.REQUIRE_APPROVAL, "public contract or multiple owners", data, public)
-    if risk_score >= data.approval_threshold:
+    if risk_score >= data.approval_threshold and not data.approval_satisfied:
         return _result(DecisionState.REQUIRE_APPROVAL, "risk score requires approval", data, [])
     return _result(DecisionState.ALLOW, "all hard conditions and test evidence satisfied", data, [])
 

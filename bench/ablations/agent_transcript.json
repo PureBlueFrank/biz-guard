@@ -7,32 +7,62 @@
   "revision": "phase5-v2",
   "task_id": "critical-ledger-1",
   "decision": "block",
-  "duration_ms": 3.4,
+  "duration_ms": 343.2346389963641,
   "diff_sha256": "931e439b072bc4ae2cb8ef3f52020e53a6cb2ff02da7bfe14607718b13bbcf6b",
   "tool_calls": [
     {
-      "tool": "bizguard.validate_patch",
+      "tool": "bizguard.get_change_decision",
       "input": {
         "diff_text": "diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py\n--- a/sample/coupon-service/redeem_service.py\n+++ b/sample/coupon-service/redeem_service.py\n@@ -38,5 +38,4 @@ class RedeemService:\n \n     @transaction\n     def redeem(self, coupon_id: str, idempotency_key: str) -> None:\n-        IdempotencyStore.check(idempotency_key)\n         self.ledger.redeem(coupon_id)\n"
       },
       "output": {
         "decision": "BLOCK",
+        "rationale": "critical policy violation",
         "findings": [
           {
-            "evidence_refs": [
-              "policy:redeem-must-check-idempotency-in-transaction",
-              "registry:coupon-redemption-idempotency-key",
-              "knowledge:adr-coupon-idempotency",
-              "sample/coupon-service/redeem_service.py"
-            ],
-            "finding_id": "redeem-must-check-idempotency-in-transaction",
-            "message": "目标方法缺少要求的幂等保护调用。",
-            "status": "violated"
+            "confidence": 1.0,
+            "critical_unknown": false,
+            "effect": "目标方法缺少要求的幂等保护调用。",
+            "id": "redeem-must-check-idempotency-in-transaction",
+            "owner": null,
+            "public_contract": false,
+            "remediation": "resolve the reported policy finding",
+            "required_approver": null,
+            "severity": "critical",
+            "violated": true
           }
         ],
-        "faults": []
+        "required_tests": [
+          {
+            "id": "coupon-core-redeem-idempotency-test",
+            "capability": "coupon_redemption",
+            "owner": "coupon_platform",
+            "policy": "coupon-redemption-aggregate-idempotency-key",
+            "command": "./mvnw --offline test",
+            "repository": "coupon-core",
+            "evidence": []
+          },
+          {
+            "id": "merchant-service-coupon-status-test",
+            "capability": "coupon_redemption",
+            "owner": "merchant_checkout",
+            "policy": "coupon-redemption-idempotency-key",
+            "command": "./mvnw --offline test",
+            "repository": "merchant-service",
+            "evidence": []
+          }
+        ],
+        "required_approvers": [],
+        "evidence": ["redeem-must-check-idempotency-in-transaction"],
+        "risk_score": 1.0,
+        "change_context_id": null,
+        "policy_revision": "phase5",
+        "base_revisions_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "decision_fingerprint": "b2bf4cf143dae9ae4706a7958cc615f1237d315404db28c4640f9b0b48c83047",
+        "approval_state": null,
+        "trace_id": null
       },
-      "duration_ms": 3.4
+      "duration_ms": 343.2346389963641
     }
   ]
 }

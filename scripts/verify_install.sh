@@ -5,8 +5,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 PYTHON_BIN=${PYTHON:-python3}
 
-if [ -f "$PROJECT_ROOT/../.venv/bin/activate" ]; then
-  . "$PROJECT_ROOT/../.venv/bin/activate"
+if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+  . "$PROJECT_ROOT/.venv/bin/activate"
   PYTHON_BIN=python
 fi
 
@@ -125,6 +125,7 @@ set +e
 ci_output=$("$PYTHON_BIN" -m bizguard.ci.check \
   --diff "$fixture" \
   --base-revisions "$PROJECT_ROOT/bench/fixtures/phase3-revisions.yaml" \
+  --tests-complete \
   --json)
 ci_code=$?
 set -e

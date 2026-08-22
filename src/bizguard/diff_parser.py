@@ -16,6 +16,8 @@ class ParsedHunk(BaseModel):
     """One parsed unified-diff hunk with its added and removed lines."""
 
     header: str
+    old_start: int
+    new_start: int
     lines: list[str]
     added_lines: list[str] = Field(default_factory=list)
     removed_lines: list[str] = Field(default_factory=list)
@@ -107,14 +109,17 @@ def _parse_file(lines: list[str], start: int) -> tuple[ParsedFile, int]:
             continue
         index += 1
 
-    if not has_old_header or not has_new_header or not hunks:
-        raise DiffParseError("each changed file needs ---, +++, and at least one @@ hunk")
-
     operation: Literal["add", "delete", "modify", "rename"]
     if rename_from is not None or rename_to is not None:
         if rename_from is None or rename_to is None:
             raise DiffParseError("renames must provide both rename from and rename to")
+        if (has_old_header or has_new_header or hunks) and (
+            not has_old_header or not has_new_header or not hunks
+        ):
+            raise DiffParseError("a rename with content changes needs ---, +++, and at least one @@ hunk")
         old_path, new_path, operation = rename_from, rename_to, "rename"
+    elif not has_old_header or not has_new_header or not hunks:
+        raise DiffParseError("each changed file needs ---, +++, and at least one @@ hunk")
     elif old_path is None:
         operation = "add"
     elif new_path is None:
@@ -147,6 +152,8 @@ def _parse_hunk(lines: list[str], start: int) -> tuple[ParsedHunk, int]:
     match = _HUNK_HEADER.match(header)
     if match is None:
         raise DiffParseError(f"malformed hunk header: {header}")
+    old_start = int(match.group(1))
+    new_start = int(match.group(3))
     expected_old = int(match.group(2) or 1)
     expected_new = int(match.group(4) or 1)
 
@@ -181,7 +188,14 @@ def _parse_hunk(lines: list[str], start: int) -> tuple[ParsedHunk, int]:
             f"but body has -{actual_old},+{actual_new}"
         )
 
-    return ParsedHunk(header=header, lines=body, added_lines=added_lines, removed_lines=removed_lines), index
+    return ParsedHunk(
+        header=header,
+        old_start=old_start,
+        new_start=new_start,
+        lines=body,
+        added_lines=added_lines,
+        removed_lines=removed_lines,
+    ), index
 
 
 def _header_path(value: str, prefix: str) -> str | None:

@@ -122,6 +122,11 @@ bizguard prepare --task "检查优惠券状态字段变更" \
 # 检查 unified diff 是否违反 Policy
 bizguard check --diff sample/diffs/diff_violation_1.diff
 
+# 将 BizGuard MCP 注册到 Codex 官方配置（先预览，再执行）
+bizguard connect codex --repository . --dry-run
+bizguard connect codex --repository . \
+  --identity coupon_platform --roles engineering
+
 # 分析跨服务影响
 bizguard impact analyze \
   --diff bench/fixtures/phase3/dto-status.diff \
@@ -142,10 +147,10 @@ MCP（Model Context Protocol）是让 AI 助手调用外部能力的标准接口
 2. `search_team_knowledge`：检索有权限的团队知识；
 3. `explain_symbol`：解释已索引符号及其图谱证据；
 4. `analyze_impact`：分析影响路径、未知边界和必测项；
-5. `validate_patch`：确定性校验 unified diff；
+5. `validate_patch`：兼容旧客户端的确定性 unified diff 校验；
 6. `get_required_tests`：按 Policy 找出应运行的测试；
-7. `request_approval`：显式写入并持久化审批请求（写工具，需客户端批准该副作用工具）；
-8. `get_change_decision`：返回四态聚合决策、证据、测试与审批人。
+7. `request_approval`：写入或推进审批请求；审批绑定决策指纹，执行人取自服务端认证身份；
+8. `get_change_decision`：统一返回四态聚合决策、证据、必测项和审批状态；MCP 调用方不能自行宣称测试已通过。
 
 ### 安装闭环验证
 
@@ -172,7 +177,7 @@ python scripts/run_benchmark.py \
   --transcript-out bench/ablations/codex_agent_transcript.json
 ```
 
-适配器通过 stdio MCP 只暴露 `validate_patch`，要求 Codex 原样提交冻结 diff，并解析
+适配器通过 stdio MCP 只暴露统一主链的 `get_change_decision`，要求 Codex 原样提交冻结 diff，并解析
 `codex exec --json` 的真实事件。benchmark 会用当前 FastMCP schema 再执行同一调用；只有
 输入、完整输出和最终决策全部一致时才写出 transcript。
 

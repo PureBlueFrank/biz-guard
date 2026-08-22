@@ -7,8 +7,8 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PROJECT_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 PYTHON_BIN=${PYTHON:-python3}
 
-if [ -f "$PROJECT_ROOT/../.venv/bin/activate" ]; then
-    . "$PROJECT_ROOT/../.venv/bin/activate"
+if [ -f "$PROJECT_ROOT/.venv/bin/activate" ]; then
+    . "$PROJECT_ROOT/.venv/bin/activate"
     PYTHON_BIN=python
 fi
 
@@ -17,7 +17,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 run_check() {
-    "$PYTHON_BIN" -m bizguard.cli check --diff "$1"
+    "$PYTHON_BIN" -m bizguard.cli check --diff "$1" --tests-complete
 }
 
 assert_decision() {
@@ -67,7 +67,11 @@ root = Path(sys.argv[1])
 fixture = root / "bench/fixtures/phase5/cross-service-dto-breaking.diff"
 diff_text = fixture.read_text(encoding="utf-8")
 baseline = _naive_baseline(diff_text)
-bizguard = evaluate(diff_text, {"revision": "phase3-fixture-v1"})["decision"]
+bizguard = evaluate(
+    diff_text,
+    {"revision": "phase3-fixture-v1"},
+    tests_passed=True,
+)["decision"]
 if baseline != "allow" or bizguard != "REQUIRE_APPROVAL":
     raise SystemExit(
         f"control changed: expected heuristic allow/BizGuard REQUIRE_APPROVAL, got {baseline}/{bizguard}"
@@ -103,6 +107,7 @@ set +e
 dynamic_output=$(cd "$PROJECT_ROOT" && "$PYTHON_BIN" -m bizguard.ci.check \
     --diff bench/fixtures/phase5/dynamic-mapper.diff \
     --base-revisions bench/fixtures/phase3-revisions.yaml \
+    --tests-complete \
     --json)
 dynamic_code=$?
 set -e

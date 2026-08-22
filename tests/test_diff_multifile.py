@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from bizguard.change.evaluator import ChangeEvaluator
+from bizguard.change.models import EvaluationRequest
 from bizguard.diff_parser import DiffParseError, parse_unified
 
 
@@ -78,6 +82,13 @@ rename to coupon-core/src/main/java/com/bizguard/coupon/api/NewName.java
  }
 """
 
+PURE_RENAME = """\
+diff --git a/docs/old.md b/docs/new.md
+similarity index 100%
+rename from docs/old.md
+rename to docs/new.md
+"""
+
 
 def test_two_java_files_are_both_parsed() -> None:
     parsed = parse_unified(TWO_JAVA_FILES)
@@ -125,6 +136,14 @@ def test_rename_file_uses_rename_to_path() -> None:
     assert file.operation == "rename"
     assert file.old_path == "coupon-core/src/main/java/com/bizguard/coupon/api/OldName.java"
     assert file.new_path == "coupon-core/src/main/java/com/bizguard/coupon/api/NewName.java"
+
+
+def test_pure_rename_without_content_hunk_is_supported() -> None:
+    file = parse_unified(PURE_RENAME).files[0]
+    assert file.operation == "rename"
+    assert file.old_path == "docs/old.md"
+    assert file.new_path == "docs/new.md"
+    assert file.hunks == []
 
 
 def test_malformed_hunk_raises_fault() -> None:
@@ -184,3 +203,24 @@ def test_file_order_does_not_change_parsed_content() -> None:
 def test_empty_input_raises_fault() -> None:
     with pytest.raises(DiffParseError):
         parse_unified("")
+
+
+def test_policy_validation_uses_unchanged_base_file_context(tmp_path: Path) -> None:
+    migration = tmp_path / "db/V2__ledger.sql"
+    migration.parent.mkdir(parents=True)
+    migration.write_text(
+        "BEGIN TRANSACTION;\nUPDATE ledger SET status='SUCCESS';\nCOMMIT;\n",
+        encoding="utf-8",
+    )
+    diff = """\
+diff --git a/db/V2__ledger.sql b/db/V2__ledger.sql
+--- a/db/V2__ledger.sql
++++ b/db/V2__ledger.sql
+@@ -2,1 +2,1 @@
+-UPDATE ledger SET status='SUCCESS';
++UPDATE ledger SET status='FAILED';
+"""
+    decision = ChangeEvaluator(tmp_path).evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=tmp_path, tests_passed=True)
+    )
+    assert decision.findings[0].violated is False

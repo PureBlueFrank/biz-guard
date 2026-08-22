@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
@@ -11,6 +12,7 @@ from mcp.types import ToolAnnotations
 
 from bizguard.change.evaluator import ChangeEvaluator
 from bizguard.change.models import ChangeDecision, EvaluationRequest
+from bizguard.change.store import ChangeContextStore
 from bizguard.context.compiler import ContextCompiler
 from bizguard.decision import ChangeSafetyCard, evaluate_change
 from bizguard.impact.service import ImpactService
@@ -34,6 +36,7 @@ _READ_ONLY = ToolAnnotations(readOnlyHint=True)
 _WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
 
 _approval_store: SqliteApprovalStore | None = None
+_change_store: ChangeContextStore | None = None
 
 
 def _approval_service() -> ApprovalService:
@@ -51,8 +54,44 @@ def _read_approval(change_context_id: str, policy_revision: str) -> ApprovalRequ
     return ApprovalRequest.model_validate_json(payload) if payload is not None else None
 
 
+def _configured_repository_root() -> Path:
+    return Path(os.environ.get("BIZGUARD_REPOSITORY_ROOT", _REPOSITORIES)).resolve()
+
+
+def _resolve_repository_root(requested: str | None = None) -> Path:
+    allowed = _configured_repository_root()
+    candidate = Path(requested).resolve() if requested else allowed
+    try:
+        candidate.relative_to(allowed)
+    except ValueError as exc:
+        raise ToolError("repository_root is outside the configured workspace") from exc
+    return candidate
+
+
+def _change_context_store() -> ChangeContextStore:
+    global _change_store
+    if _change_store is None:
+        path = Path(os.environ.get("BIZGUARD_CONTEXT_DB", _ROOT / ".artifacts" / "contexts.sqlite3"))
+        _change_store = ChangeContextStore(path)
+    return _change_store
+
+
+def _caller_roles() -> set[str]:
+    """Return server-authenticated roles; resource URIs never supply their own roles."""
+    return {
+        role.strip()
+        for role in os.environ.get("BIZGUARD_CALLER_ROLES", "engineering").split(",")
+        if role.strip()
+    }
+
+
+def _caller_identity() -> str:
+    """Return the deployment-authenticated principal, never a tool argument."""
+    return os.environ.get("BIZGUARD_CALLER_IDENTITY", "engineering").strip()
+
+
 def _compiler() -> ContextCompiler:
-    return ContextCompiler(_REPOSITORIES)
+    return ContextCompiler(_configured_repository_root(), store=_change_context_store())
 
 
 @mcp.tool(description="从任务、仓库和基线版本真实编译只读 Context Pack；没有副作用。", annotations=_READ_ONLY)
@@ -91,13 +130,15 @@ def search_team_knowledge(
 @mcp.tool(description="解释指定的已索引符号及其真实图证据；只读且没有副作用。", annotations=_READ_ONLY)
 def explain_symbol(symbol: str, revision: str) -> dict[str, object]:
     """Return indexed symbol details and graph evidence."""
-    return SymbolService(_REPOSITORIES).explain(symbol, revision).model_dump(mode="json")
+    return SymbolService(_configured_repository_root()).explain(symbol, revision).model_dump(mode="json")
 
 
 @mcp.tool(description="基于真实图快照分析影响路径、未知边界和必需测试；只读且没有副作用。", annotations=_READ_ONLY)
 def analyze_impact(changed_symbol: str, revision: str, capability: str = "coupon_redemption") -> dict[str, object]:
     """Analyze the impact path for an indexed symbol."""
-    return ImpactService(_REPOSITORIES).analyze(changed_symbol, revision, capability).model_dump(mode="json")
+    return ImpactService(_configured_repository_root()).analyze(
+        changed_symbol, revision, capability
+    ).model_dump(mode="json")
 
 
 @mcp.tool(description="只读确定性 unified diff 校验：不写入文件、不调用外部服务。P5 将与聚合决策分叉。", annotations=_READ_ONLY)
@@ -117,22 +158,48 @@ def get_required_tests(capability: str, policy_id: str) -> list[dict[str, object
 def request_approval(
     change_context_id: str,
     policy_revision: str,
-    approvers: list[str],
-    required_cosigns: int,
+    decision_fingerprint: str,
+    action: Literal["create", "approve", "reject", "add_evidence"] = "create",
+    approvers: list[str] | None = None,
+    required_cosigns: int = 1,
     evidence_refs: list[str] | None = None,
-    requested_by: str = "engineering",
+    reason: str | None = None,
+    evidence: str | None = None,
 ) -> dict[str, object]:
-    """Create a persisted approval request for a change context."""
-    request = _approval_service().create(
-        ApprovalRequest(
-            change_context_id=change_context_id,
-            policy_revision=policy_revision,
-            approvers=tuple(approvers),
-            required_cosigns=required_cosigns,
-            evidence_refs=list(evidence_refs or []),
+    """Create or advance a persisted approval request."""
+    service = _approval_service()
+    if action == "create":
+        if _change_context_store().get(change_context_id) is None:
+            raise ToolError("change context unavailable")
+        request = service.create(
+            ApprovalRequest(
+                change_context_id=change_context_id,
+                policy_revision=policy_revision,
+                decision_fingerprint=decision_fingerprint,
+                approvers=tuple(approvers or []),
+                required_cosigns=required_cosigns,
+                requested_by=_caller_identity(),
+                evidence_refs=list(evidence_refs or []),
+            )
         )
-    )
-    return request.model_dump(mode="json")
+        return request.model_dump(mode="json")
+    existing = _read_approval(change_context_id, policy_revision)
+    if existing is None:
+        raise ToolError("approval request unavailable")
+    if existing.decision_fingerprint != decision_fingerprint:
+        raise ToolError("approval request fingerprint mismatch")
+    actor = _caller_identity()
+    if action == "approve":
+        service.approve(existing, actor)
+    elif action == "reject":
+        if reason is None:
+            raise ToolError("reason is required to reject")
+        service.reject(existing, actor, reason)
+    else:
+        if evidence is None:
+            raise ToolError("evidence is required")
+        service.add_evidence(existing, evidence)
+    return existing.model_dump(mode="json")
 
 
 @mcp.tool(description="聚合确定性校验为四态决定、证据链、必需测试和审批人；只读且没有副作用。", annotations=_READ_ONLY)
@@ -142,9 +209,14 @@ def get_change_decision(
     change_context_id: str | None = None,
     policy_revision: str = "phase5",
 ) -> ChangeDecision:
-    """Return the canonical four-state decision, optionally attaching approval state."""
-    root = Path(repository_root) if repository_root else _REPOSITORIES
-    decision = ChangeEvaluator(root).evaluate(
+    """Return a canonical decision; untrusted MCP callers cannot assert CI test success."""
+    root = _resolve_repository_root(repository_root)
+    if change_context_id is not None:
+        if _change_context_store().get(change_context_id) is None:
+            raise ToolError("change context unavailable")
+        _approval_service()
+    store = _approval_store
+    return ChangeEvaluator(root, approval_store=store).evaluate(
         EvaluationRequest(
             diff_text=diff_text,
             repository_root=root,
@@ -152,37 +224,24 @@ def get_change_decision(
             policy_revision=policy_revision,
         )
     )
-    if change_context_id is not None:
-        decision = _attach_approval(decision, change_context_id, policy_revision)
-    return decision
-
-
-def _attach_approval(
-    decision: ChangeDecision, change_context_id: str, policy_revision: str
-) -> ChangeDecision:
-    request = _read_approval(change_context_id, policy_revision)
-    if request is None:
-        return decision
-    if request.waiver is not None and not request.waiver.active():
-        decision.approval_state = "expired"
-    else:
-        decision.approval_state = request.state.value
-    return decision
 
 
 @mcp.resource("bizguard://changes/{change_context_id}")
 def change_resource(change_context_id: str) -> dict[str, object]:
     """Summarize a persisted change context without dumping full documents."""
-    request = _read_approval(change_context_id, "phase5")
-    if request is None:
+    payload = _change_context_store().get(change_context_id)
+    if payload is None:
         raise ToolError("resource unavailable")
+    from bizguard.context.compiler import ContextPack
+
+    context = ContextPack.model_validate_json(payload)
     return {
         "change_context_id": change_context_id,
-        "summary": request.state.value,
-        "revision": request.policy_revision,
-        "freshness": request.updated_at.isoformat() if request.updated_at else None,
-        "confidence": 1.0,
-        "evidence_links": request.evidence_refs,
+        "summary": context.task,
+        "revision": context.index_revision,
+        "freshness": "stale" if context.stale else "current",
+        "confidence": 1.0 if not context.unknowns else 0.5,
+        "evidence_links": [str(item.get("id")) for item in context.evidence],
     }
 
 
@@ -193,7 +252,10 @@ def symbol_resource(symbol_id: str) -> dict[str, object]:
 
     symbol = unquote(symbol_id)
     try:
-        result = SymbolService(_REPOSITORIES).explain(symbol, "phase3-fixture-v1")
+        result = SymbolService(_configured_repository_root()).explain(
+            symbol,
+            "phase3-fixture-v1",
+        )
     except ValueError:
         raise ToolError("resource unavailable") from None
     return {
@@ -254,7 +316,7 @@ def evidence_resource(evidence_id: str) -> dict[str, object]:
     try:
         ingest_directory(_ROOT / "knowledge/published", repository)
         entry = next((item for item in repository.all() if item.id == evidence_id), None)
-        if entry is None:
+        if entry is None or not set(entry.acl).intersection(_caller_roles()):
             raise ToolError("resource unavailable")
         return {
             "id": entry.id,

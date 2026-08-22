@@ -2,13 +2,13 @@
   "agent": "codex-cli",
   "bizguard_version": "0.1.0",
   "codex_event_count": 12,
-  "codex_thread_id": "01a02932-d609-7f13-89fe-5077a222a200",
+  "codex_thread_id": "01a029e0-a3d3-7c00-a3c2-f5416b66c44c",
   "decision": "block",
   "diff_sha256": "931e439b072bc4ae2cb8ef3f52020e53a6cb2ff02da7bfe14607718b13bbcf6b",
-  "duration_ms": 24803.2999499992,
+  "duration_ms": 30286.61024699977,
   "model": "gpt-5.6-terra",
   "prompt": "check redemption idempotency",
-  "rationale": "\u76ee\u6807\u65b9\u6cd5\u7f3a\u5c11\u8981\u6c42\u7684\u5e42\u7b49\u4fdd\u62a4\u8c03\u7528\u3002",
+  "rationale": "critical policy violation",
   "revision": "phase5-v2",
   "task_id": "critical-ledger-1",
   "tool_calls": [
@@ -18,31 +18,63 @@
         "diff_text": "diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py\n--- a/sample/coupon-service/redeem_service.py\n+++ b/sample/coupon-service/redeem_service.py\n@@ -38,5 +38,4 @@ class RedeemService:\n \n     @transaction\n     def redeem(self, coupon_id: str, idempotency_key: str) -> None:\n-        IdempotencyStore.check(idempotency_key)\n         self.ledger.redeem(coupon_id)\n"
       },
       "output": {
+        "approval_state": null,
+        "base_revisions_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "change_context_id": null,
         "decision": "BLOCK",
-        "faults": [],
+        "decision_fingerprint": "b2bf4cf143dae9ae4706a7958cc615f1237d315404db28c4640f9b0b48c83047",
+        "evidence": [
+          "redeem-must-check-idempotency-in-transaction"
+        ],
         "findings": [
           {
-            "evidence_refs": [
-              "policy:redeem-must-check-idempotency-in-transaction",
-              "registry:coupon-redemption-idempotency-key",
-              "knowledge:adr-coupon-idempotency",
-              "sample/coupon-service/redeem_service.py"
-            ],
-            "finding_id": "redeem-must-check-idempotency-in-transaction",
-            "message": "\u76ee\u6807\u65b9\u6cd5\u7f3a\u5c11\u8981\u6c42\u7684\u5e42\u7b49\u4fdd\u62a4\u8c03\u7528\u3002",
-            "status": "violated"
+            "confidence": 1.0,
+            "critical_unknown": false,
+            "effect": "\u76ee\u6807\u65b9\u6cd5\u7f3a\u5c11\u8981\u6c42\u7684\u5e42\u7b49\u4fdd\u62a4\u8c03\u7528\u3002",
+            "id": "redeem-must-check-idempotency-in-transaction",
+            "owner": null,
+            "public_contract": false,
+            "remediation": "resolve the reported policy finding",
+            "required_approver": null,
+            "severity": "critical",
+            "violated": true
           }
-        ]
+        ],
+        "policy_revision": "phase5",
+        "rationale": "critical policy violation",
+        "required_approvers": [],
+        "required_tests": [
+          {
+            "capability": "coupon_redemption",
+            "command": "./mvnw --offline test",
+            "evidence": [],
+            "id": "coupon-core-redeem-idempotency-test",
+            "owner": "coupon_platform",
+            "policy": "coupon-redemption-aggregate-idempotency-key",
+            "repository": "coupon-core"
+          },
+          {
+            "capability": "coupon_redemption",
+            "command": "./mvnw --offline test",
+            "evidence": [],
+            "id": "merchant-service-coupon-status-test",
+            "owner": "merchant_checkout",
+            "policy": "coupon-redemption-idempotency-key",
+            "repository": "merchant-service"
+          }
+        ],
+        "risk_score": 1.0,
+        "trace_id": null
       },
-      "tool": "bizguard.validate_patch"
+      "tool": "bizguard.get_change_decision"
     }
   ],
   "track": "live",
   "usage": {
     "cache_write_input_tokens": 0,
     "cached_input_tokens": 34304,
-    "input_tokens": 53288,
-    "output_tokens": 332,
-    "reasoning_output_tokens": 55
+    "input_tokens": 53805,
+    "output_tokens": 363,
+    "reasoning_output_tokens": 97
   }
 }

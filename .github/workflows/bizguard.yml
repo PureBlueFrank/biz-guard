@@ -15,6 +15,7 @@ jobs:
       - run: python -m mypy src tests agents_mcp
       - run: python -m pytest -q
   gate:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,6 +39,8 @@ jobs:
             --diff /tmp/pr.diff \
             --base-revisions /tmp/base-revisions.yaml \
             --repository-root . \
+            --tests-complete \
+            --audit-log /tmp/bizguard-audit.json \
             --json > /tmp/bizguard-result.json
           code=$?
           set -e
@@ -58,3 +61,11 @@ for finding in payload.get("findings", []):
 PY
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$code"
+      - name: Upload BizGuard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bizguard-gate-evidence
+          path: |
+            /tmp/bizguard-result.json
+            /tmp/bizguard-audit.json

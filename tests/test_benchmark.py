@@ -9,6 +9,8 @@ import yaml  # type: ignore[import-untyped]
 from pytest import MonkeyPatch
 
 from bizguard.context.compiler import ContextCompiler
+from bizguard.change.evaluator import ChangeEvaluator
+from bizguard.change.models import EvaluationRequest
 
 from scripts.run_benchmark import BASELINES, TRANSCRIPT, _predict, run
 
@@ -68,7 +70,7 @@ def test_offline_trajectory_is_loaded_from_recorded_mcp_transcript() -> None:
 
     assert output["agent_trajectory"] == transcript
     assert transcript["track"] == "recorded"
-    assert transcript["tool_calls"][0]["tool"] == "bizguard.validate_patch"
+    assert transcript["tool_calls"][0]["tool"] == "bizguard.get_change_decision"
     assert all(transcript.get(field) for field in ("agent", "model", "prompt", "bizguard_version", "revision", "task_id", "decision", "duration_ms"))
     assert "diff_text" in transcript["tool_calls"][0]["input"]
 
@@ -127,9 +129,25 @@ def test_live_track_rejects_tampered_mcp_output(monkeypatch: MonkeyPatch) -> Non
         benchmark.run(DATASET, offline=False)
 
 
-def test_full_matches_all_twelve_golden_task_outcomes() -> None:
+def test_full_is_exactly_the_canonical_evaluator_not_truth_metadata() -> None:
     payload = yaml.safe_load(DATASET.read_text(encoding="utf-8"))
-    assert [_predict(task, "Full", DATASET) for task in payload["tasks"]] == [task["truth"] for task in payload["tasks"]]
+    mapping = {
+        "ALLOW": "allow",
+        "ALLOW_WITH_TESTS": "tests",
+        "REQUIRE_APPROVAL": "approval",
+        "BLOCK": "block",
+    }
+    for task in payload["tasks"]:
+        diff = (DATASET.parent / task["diff"]).resolve().read_text(encoding="utf-8")
+        expected = ChangeEvaluator(ROOT / "fixtures/java-microservices").evaluate(
+            EvaluationRequest(
+                diff_text=diff,
+                repository_root=ROOT / "fixtures/java-microservices",
+                base_revisions=task["base_revisions"],
+                tests_passed=bool(task["tests_passed"]),
+            )
+        )
+        assert _predict(task, "Full", DATASET) == mapping[expected.decision.value]
 
 
 def test_prediction_changes_when_its_real_diff_content_changes(tmp_path: Path) -> None:

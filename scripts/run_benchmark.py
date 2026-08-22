@@ -19,9 +19,11 @@ from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped]
 
+from bizguard.change.evaluator import ChangeEvaluator
+from bizguard.change.models import EvaluationRequest
 from bizguard.context.compiler import ContextCompiler
 from bizguard.decision import Decision, evaluate_change
-from bizguard.decision.v2 import DecisionInput, DecisionState, FindingV2, decide
+from bizguard.decision.v2 import DecisionState
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest, SearchResult
 from bizguard.knowledge.repository import KnowledgeRepository
@@ -52,7 +54,12 @@ _TRANSCRIPT_FIELDS = {
     "tool_calls",
     "diff_sha256",
 }
-_MCP_DECISIONS = {"ALLOW": "allow", "BLOCK": "block", "CHECK_INCOMPLETE": "approval"}
+_MCP_DECISIONS = {
+    "ALLOW": "allow",
+    "ALLOW_WITH_TESTS": "tests",
+    "REQUIRE_APPROVAL": "approval",
+    "BLOCK": "block",
+}
 
 
 def _read_diff(task: dict[str, Any], dataset: Path) -> tuple[Path, str]:
@@ -148,31 +155,28 @@ def _naive_baseline(diff_text: str) -> str:
 def _full(
     task: dict[str, Any], diff_text: str, compiler: ContextCompiler | None = None, cache: dict[str, dict[str, Any]] | None = None
 ) -> str:
-    """Run policy validators then feed their real result into Decision v2."""
-    policy = evaluate_change(diff_text)
-    _, pack = _context(task, compiler, cache)
-    violated = policy.decision is Decision.BLOCK
-    unknown = policy.decision is Decision.CHECK_INCOMPLETE
-    finding = FindingV2(
-        id="policy-pipeline",
-        severity="critical" if violated else "medium",
-        effect="AST policy evaluation",
-        remediation="resolve policy findings",
-        confidence=1.0,
-        violated=violated,
-        critical_unknown=unknown,
-        public_contract=bool(task.get("public_contract", False)),
-    )
-    result = decide(
-        DecisionInput(
-            findings=[finding],
+    """Run the same canonical evaluator used by CLI, MCP, hooks, and CI."""
+    del compiler
+    cache_key = "full:" + sha256(
+        (diff_text + "\0" + str(bool(task["tests_passed"]))).encode("utf-8")
+    ).hexdigest()
+    if cache is not None and cache_key in cache:
+        return str(cache[cache_key]["outcome"])
+    revisions = task.get("base_revisions", {})
+    if not isinstance(revisions, dict):
+        raise ValueError(f"task {task.get('id')} has invalid base revisions")
+    result = ChangeEvaluator(ROOT / "fixtures" / "java-microservices").evaluate(
+        EvaluationRequest(
+            diff_text=diff_text,
+            repository_root=ROOT / "fixtures" / "java-microservices",
+            base_revisions={str(key): value for key, value in revisions.items()},
             tests_passed=bool(task["tests_passed"]),
-            required_tests=cast(list[str], [str(item["id"]) for item in pack["required_tests"]]),
-            owners=cast(list[str], pack["required_approvers"]) + cast(list[str], task.get("owners", [])),
-            version_known=not unknown,
         )
     )
-    return _OUTCOMES[result.decision]
+    outcome = _OUTCOMES[result.decision]
+    if cache is not None:
+        cache[cache_key] = {"outcome": outcome}
+    return outcome
 
 
 def _predict(
@@ -312,12 +316,12 @@ def _validate_tool_calls(
     for call in calls:
         tool = call.get("tool")
         arguments = call.get("input")
-        if tool != "bizguard.validate_patch" or not isinstance(arguments, dict):
+        if tool != "bizguard.get_change_decision" or not isinstance(arguments, dict):
             raise ValueError("recorded agent transcript has an unsupported tool call")
         if arguments != {"diff_text": diff_text}:
             raise ValueError("recorded agent transcript MCP input does not match fixture")
         try:
-            result = asyncio.run(mcp.call_tool("validate_patch", arguments))
+            result = asyncio.run(mcp.call_tool("get_change_decision", arguments))
         except (ToolError, ValueError) as exc:
             raise ValueError("recorded agent transcript tool input fails MCP schema validation") from exc
         if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], dict):
