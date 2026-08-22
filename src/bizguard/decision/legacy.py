@@ -82,7 +82,11 @@ def evaluate_change(diff_text: str) -> ChangeSafetyCard:
         parsed_diff = parse(diff_text)
     except DiffParseError as exc:
         return _incomplete(FaultCode.DIFF_PARSE, str(exc))
+    return evaluate_parsed(parsed_diff)
 
+
+def evaluate_parsed(parsed_diff: ParsedDiff) -> ChangeSafetyCard:
+    """Evaluate an already-parsed diff through the Python invariant pipeline."""
     try:
         registry = load_contract_registry(_PROJECT_ROOT / "registry" / "contracts.yaml")
         invariants = load_invariants(_PROJECT_ROOT / "policy" / "invariants.yaml")
