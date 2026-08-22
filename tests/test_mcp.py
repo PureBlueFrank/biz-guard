@@ -11,8 +11,9 @@ from mcp.server.fastmcp.exceptions import ToolError
 import pytest
 
 from agents_mcp.server import mcp
+from bizguard.change.evaluator import ChangeEvaluator
+from bizguard.change.models import EvaluationRequest
 from bizguard.decision import evaluate_change
-from bizguard.decision.v2 import decide_diff
 
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -58,7 +59,7 @@ def test_mcp_tool_matches_shared_decision() -> None:
 
 
 def test_cli_and_mcp_return_the_same_v2_decision() -> None:
-    """CLI and v2 MCP decision expose the same four-state evidence contract."""
+    """CLI and MCP decision expose the same canonical four-state contract."""
     diff_path = PROJECT_ROOT / "sample/diffs/diff_violation_1.diff"
     environment = os.environ | {"PYTHONPATH": str(PROJECT_ROOT / "src")}
     cli = subprocess.run(
@@ -71,9 +72,13 @@ def test_cli_and_mcp_return_the_same_v2_decision() -> None:
     )
 
     mcp_result = _call_tool("get_change_decision", {"diff_text": diff_path.read_text(encoding="utf-8")})
+    root = PROJECT_ROOT / "fixtures" / "java-microservices"
+    evaluator = ChangeEvaluator(root).evaluate(
+        EvaluationRequest(diff_text=diff_path.read_text(encoding="utf-8"), repository_root=root)
+    )
 
     assert cli.returncode == 1
-    assert json.loads(cli.stdout) == _structured_card(mcp_result) == decide_diff(diff_path.read_text()).model_dump(mode="json")
+    assert json.loads(cli.stdout) == _structured_card(mcp_result) == evaluator.model_dump(mode="json")
 
 
 def test_legacy_diff_adapters_remain_compatible() -> None:

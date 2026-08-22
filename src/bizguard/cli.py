@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -14,7 +15,10 @@ from bizguard.decision import (
     Finding,
     FindingStatus,
 )
-from bizguard.decision.v2 import DecisionResult, DecisionState, decide_diff
+from bizguard.change.evaluator import ChangeEvaluator
+from bizguard.change.models import ChangeDecision, EvaluationRequest
+from bizguard.connectors import connect
+from bizguard.decision.v2 import DecisionState
 from bizguard.context.compiler import ContextCompiler, ContextPack
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
@@ -31,8 +35,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     check_parser = subparsers.add_parser("check")
     check_parser.add_argument("--diff", type=Path, required=True)
+    check_parser.add_argument("--repository-root", type=Path, default=None)
+    check_parser.add_argument("--base-revisions", type=Path, default=None)
     doctor_parser = subparsers.add_parser("doctor")
     doctor_parser.add_argument("--json", action="store_true")
+    doctor_parser.add_argument("--repository", type=Path, default=None)
     impact_parser = subparsers.add_parser("impact")
     impact_subparsers = impact_parser.add_subparsers(dest="impact_command")
     analyze_parser = impact_subparsers.add_parser("analyze")
@@ -70,6 +77,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     tests_required.add_argument("--capability", required=True)
     tests_required.add_argument("--policy", required=True)
     tests_required.add_argument("--json", action="store_true")
+    hook_parser = subparsers.add_parser("hook")
+    hook_parser.add_argument("--repository", type=Path, default=None)
+    init_parser = subparsers.add_parser("init")
+    init_parser.add_argument("--repository", type=Path, default=None)
+    init_parser.add_argument("--dry-run", action="store_true")
+    connect_parser = subparsers.add_parser("connect")
+    connect_parser.add_argument("agent", choices=["claude-code", "codex"])
+    connect_parser.add_argument("--repository", type=Path, default=None)
+    connect_parser.add_argument("--dry-run", action="store_true")
+    verify_parser = subparsers.add_parser("verify-install")
+    verify_parser.add_argument("--repository", type=Path, default=None)
+    verify_parser.add_argument("--offline", action="store_true")
     try:
         arguments = parser.parse_args(argv)
     except SystemExit as exc:
@@ -91,6 +110,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _symbol_explain(arguments)
     if arguments.command == "tests":
         return _tests_required(arguments)
+    if arguments.command == "hook":
+        return _hook(arguments)
+    if arguments.command == "init":
+        return _init(arguments)
+    if arguments.command == "connect":
+        return _connect(arguments)
+    if arguments.command == "verify-install":
+        return _verify_install(arguments)
     diff_path = arguments.diff
     if not diff_path.is_file() or not diff_path.stat().st_mode:
         print("--diff must identify an existing readable unified diff file", file=sys.stderr)
@@ -103,22 +130,156 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_card(_invalid_input_card("无法读取 diff 文件。", [str(diff_path)]))
         return 2
 
-    result = decide_diff(diff_text)
-    _print_result(result)
-    return _exit_code_v2(result)
+    result = _evaluate_change(arguments, diff_text)
+    print(result.model_dump_json())
+    return _exit_code_v4(result)
 
 
 def _doctor(arguments: argparse.Namespace) -> int:
-    """Diagnose local, read-only prerequisites without contacting any service."""
-    root = _project_root()
+    """Diagnose local prerequisites and report ok / degraded / failed per check."""
+    root = arguments.repository or _project_root()
     checks = {
-        "policy": (root / "policy" / "invariants.yaml").is_file(),
-        "catalog": (root / "src/bizguard/semantic/catalog.yaml").is_file(),
-        "mcp": True,
+        "python": _check_python(),
+        "policy": _status((root / "policy" / "phase5-registry.yaml").is_file()),
+        "catalog": _status((root / "src/bizguard/semantic/catalog.yaml").is_file()),
+        "mcp": _check_mcp(),
+        "store": _check_store(root),
+        "graph": _check_graph(root),
+        "ci_workflow": _status((root / ".github" / "workflows" / "bizguard.yml").is_file()),
+        "agent_config": _check_agent_config(root),
     }
-    payload = {"ok": all(checks.values()), "checks": checks}
-    print(json.dumps(payload, sort_keys=True) if arguments.json else ("ok" if payload["ok"] else "failed"))
-    return 0 if payload["ok"] else 1
+    ok = all(status != "failed" for status in checks.values())
+    degraded = any(status == "degraded" for status in checks.values())
+    payload = {"ok": ok, "degraded": degraded, "checks": checks}
+    print(json.dumps(payload, sort_keys=True) if arguments.json else ("ok" if ok else "failed"))
+    return 0 if ok else 1
+
+
+def _status(condition: bool) -> str:
+    return "ok" if condition else "failed"
+
+
+def _check_python() -> str:
+    return "ok" if sys.version_info >= (3, 12) else "failed"
+
+
+def _check_mcp() -> str:
+    try:
+        from agents_mcp.server import mcp
+        import asyncio
+
+        if len(asyncio.run(mcp.list_tools())) != 8:
+            return "degraded"
+    except Exception:
+        return "failed"
+    return "ok"
+
+
+def _check_store(root: Path) -> str:
+    import tempfile
+
+    from bizguard.workflow.store import SqliteApprovalStore
+
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SqliteApprovalStore(Path(directory) / "approvals.sqlite3")
+            store.put("probe", "probe", "a", "{}", "now")
+            store.close()
+    except Exception:
+        return "failed"
+    return "ok"
+
+
+def _check_graph(root: Path) -> str:
+    try:
+        from bizguard.graph.indexer import index
+
+        index(root / "fixtures" / "java-microservices", "phase3-fixture-v1")
+    except Exception:
+        return "failed"
+    return "ok"
+
+
+def _check_agent_config(root: Path) -> str:
+    has_claude = (root / ".claude" / "settings.json").is_file()
+    has_codex = (root / ".codex").is_dir()
+    return "ok" if has_claude or has_codex else "degraded"
+
+
+def _hook(arguments: argparse.Namespace) -> int:
+    root = arguments.repository or Path.cwd()
+    diff = _git_output(root, ["diff"])
+    base = _git_output(root, ["rev-parse", "HEAD"]).strip() or "unknown"
+    decision = ChangeEvaluator(root).evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=root, base_revisions={"revision": base})
+    )
+    print(decision.model_dump_json())
+    return _exit_code_v4(decision)
+
+
+def _git_output(root: Path, args: list[str]) -> str:
+    result = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False)
+    return result.stdout
+
+
+def _init(arguments: argparse.Namespace) -> int:
+    root = arguments.repository or _project_root()
+    payload = {
+        "languages": _detect_languages(root),
+        "build_tool": _detect_build_tool(root),
+        "contracts": _detect_contracts(root),
+        "codeowners": (root / "CODEOWNERS").is_file() or (root / ".github" / "CODEOWNERS").is_file(),
+        "agent_config": _detect_agent_config(root),
+    }
+    print(json.dumps(payload, sort_keys=True))
+    return 0
+
+
+def _detect_languages(root: Path) -> list[str]:
+    suffixes: set[str] = set()
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix in {".py", ".java", ".proto", ".yaml", ".yml", ".sql"}:
+            suffixes.add(path.suffix.lstrip("."))
+    return sorted(suffixes)
+
+
+def _detect_build_tool(root: Path) -> list[str]:
+    markers = {"pom.xml": "maven", "build.gradle": "gradle", "pyproject.toml": "python"}
+    return sorted(name for filename, name in markers.items() if (root / filename).is_file())
+
+
+def _detect_contracts(root: Path) -> list[str]:
+    suffixes = {".proto", ".avsc", ".schema"}
+    return sorted({path.suffix.lstrip(".") for path in root.rglob("*") if path.is_file() and path.suffix in suffixes})
+
+
+def _detect_agent_config(root: Path) -> list[str]:
+    found = []
+    if (root / ".claude" / "settings.json").is_file():
+        found.append("claude-code")
+    if (root / ".codex").is_dir():
+        found.append("codex")
+    return found
+
+
+def _connect(arguments: argparse.Namespace) -> int:
+    root = arguments.repository or Path.cwd()
+    result = connect(arguments.agent, root, dry_run=arguments.dry_run)
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+def _verify_install(arguments: argparse.Namespace) -> int:
+    root = arguments.repository or _project_root()
+    script = root / "scripts" / "verify_install.sh"
+    if not script.is_file():
+        print("verify_install.sh not found", file=sys.stderr)
+        return 2
+    args = [str(script)]
+    if arguments.offline:
+        args.append("--offline")
+    result = subprocess.run(args, cwd=root, check=False)
+    return result.returncode
 
 
 def _impact(arguments: argparse.Namespace) -> int:
@@ -223,8 +384,22 @@ def _print_card(card: ChangeSafetyCard) -> None:
     print(card.model_dump_json())
 
 
-def _print_result(result: DecisionResult) -> None:
-    print(result.model_dump_json())
+def _evaluate_change(arguments: argparse.Namespace, diff_text: str) -> ChangeDecision:
+    import yaml
+
+    root = arguments.repository_root or _project_root() / "fixtures" / "java-microservices"
+    base_revisions: dict[str, object] = {}
+    if arguments.base_revisions is not None:
+        raw = yaml.safe_load(arguments.base_revisions.read_text(encoding="utf-8")) or {}
+        if isinstance(raw, dict):
+            base_revisions = raw
+    return ChangeEvaluator(root).evaluate(
+        EvaluationRequest(
+            diff_text=diff_text,
+            repository_root=root,
+            base_revisions=base_revisions,
+        )
+    )
 
 
 def _exit_code(card: ChangeSafetyCard) -> int:
@@ -243,8 +418,10 @@ def _exit_code(card: ChangeSafetyCard) -> int:
     }.get(next(iter(fault_codes), FaultCode.DIFF_PARSE), 3)
 
 
-def _exit_code_v2(result: DecisionResult) -> int:
-    return 1 if result.decision is DecisionState.BLOCK else 0
+def _exit_code_v4(result: ChangeDecision) -> int:
+    if result.decision is DecisionState.ALLOW:
+        return 0
+    return 1
 
 
 if __name__ == "__main__":

@@ -67,6 +67,47 @@ def test_required_tests_delegates_to_semantic_catalog() -> None:
     assert _call("get_required_tests", arguments) == {"result": expected}
 
 
-def test_schema_only_approval_never_writes() -> None:
-    with pytest.raises(ToolError, match="schema-only"):
+def test_request_approval_rejects_legacy_schema_only_args() -> None:
+    with pytest.raises(ToolError):
         _call("request_approval", {"change_context_id": "ctx", "requested_by": "engineering", "reason": "review"})
+
+
+def test_request_approval_persists_pending_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agents_mcp.server as server
+
+    monkeypatch.setenv("BIZGUARD_APPROVAL_DB", str(tmp_path / "approvals.sqlite3"))
+    monkeypatch.setattr(server, "_approval_store", None)
+    created = _call(
+        "request_approval",
+        {
+            "change_context_id": "ctx-1",
+            "policy_revision": "phase5",
+            "approvers": ["coupon_platform"],
+            "required_cosigns": 1,
+        },
+    )
+    assert created["state"] == "pending"
+    assert created["change_context_id"] == "ctx-1"
+
+
+def test_get_change_decision_attaches_approval_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agents_mcp.server as server
+
+    monkeypatch.setenv("BIZGUARD_APPROVAL_DB", str(tmp_path / "approvals.sqlite3"))
+    monkeypatch.setattr(server, "_approval_store", None)
+    _call(
+        "request_approval",
+        {
+            "change_context_id": "ctx-dm",
+            "policy_revision": "phase5",
+            "approvers": ["coupon_platform"],
+            "required_cosigns": 1,
+        },
+    )
+    diff_text = (ROOT / "bench" / "fixtures" / "phase5" / "dynamic-mapper.diff").read_text(encoding="utf-8")
+    decision = _call("get_change_decision", {"diff_text": diff_text, "change_context_id": "ctx-dm"})
+    assert decision["approval_state"] == "pending"
