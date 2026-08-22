@@ -20,6 +20,7 @@ import yaml  # type: ignore[import-untyped]
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 DEFAULT_DATASET = ROOT / "bench/ablations/tasks.yaml"
 MCP_TOOL_NAME = "bizguard.validate_patch"
 _DECISIONS = {"ALLOW": "allow", "BLOCK": "block", "CHECK_INCOMPLETE": "approval"}

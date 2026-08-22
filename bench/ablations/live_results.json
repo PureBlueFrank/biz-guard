@@ -1,0 +1,639 @@
+{
+  "agent_trajectory": {
+    "agent": "codex-cli",
+    "bizguard_version": "0.1.0",
+    "codex_event_count": 12,
+    "codex_thread_id": "01a02932-d609-7f13-89fe-5077a222a200",
+    "decision": "block",
+    "diff_sha256": "931e439b072bc4ae2cb8ef3f52020e53a6cb2ff02da7bfe14607718b13bbcf6b",
+    "duration_ms": 24803.2999499992,
+    "model": "gpt-5.6-terra",
+    "prompt": "check redemption idempotency",
+    "rationale": "\u76ee\u6807\u65b9\u6cd5\u7f3a\u5c11\u8981\u6c42\u7684\u5e42\u7b49\u4fdd\u62a4\u8c03\u7528\u3002",
+    "revision": "phase5-v2",
+    "task_id": "critical-ledger-1",
+    "tool_calls": [
+      {
+        "codex_item_id": "item_2",
+        "input": {
+          "diff_text": "diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py\n--- a/sample/coupon-service/redeem_service.py\n+++ b/sample/coupon-service/redeem_service.py\n@@ -38,5 +38,4 @@ class RedeemService:\n \n     @transaction\n     def redeem(self, coupon_id: str, idempotency_key: str) -> None:\n-        IdempotencyStore.check(idempotency_key)\n         self.ledger.redeem(coupon_id)\n"
+        },
+        "output": {
+          "decision": "BLOCK",
+          "faults": [],
+          "findings": [
+            {
+              "evidence_refs": [
+                "policy:redeem-must-check-idempotency-in-transaction",
+                "registry:coupon-redemption-idempotency-key",
+                "knowledge:adr-coupon-idempotency",
+                "sample/coupon-service/redeem_service.py"
+              ],
+              "finding_id": "redeem-must-check-idempotency-in-transaction",
+              "message": "\u76ee\u6807\u65b9\u6cd5\u7f3a\u5c11\u8981\u6c42\u7684\u5e42\u7b49\u4fdd\u62a4\u8c03\u7528\u3002",
+              "status": "violated"
+            }
+          ]
+        },
+        "tool": "bizguard.validate_patch"
+      }
+    ],
+    "track": "live",
+    "usage": {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 34304,
+      "input_tokens": 53288,
+      "output_tokens": 332,
+      "reasoning_output_tokens": 55
+    }
+  },
+  "baselines": [
+    {
+      "approval_precision": 1.0,
+      "approval_recall": 0.6666666666666666,
+      "baseline": "Naive Baseline",
+      "confusion_matrix": {
+        "allow": {
+          "allow": 2,
+          "approval": 0,
+          "block": 0,
+          "tests": 0
+        },
+        "approval": {
+          "allow": 1,
+          "approval": 2,
+          "block": 0,
+          "tests": 0
+        },
+        "block": {
+          "allow": 0,
+          "approval": 0,
+          "block": 4,
+          "tests": 0
+        },
+        "tests": {
+          "allow": 2,
+          "approval": 0,
+          "block": 1,
+          "tests": 0
+        }
+      },
+      "critical_violation_recall": 1.0,
+      "duration_ms_avg": 4.89108239999041,
+      "duration_ms_p50": 4.384224997920683,
+      "duration_ms_p95": 7.278348401450784,
+      "false_block_rate": 0.125,
+      "impact_recall": 0.7142857142857143,
+      "macro_f1": 0.5650793650793651,
+      "mcp_calls": 0,
+      "required_test_recall": 0.0,
+      "sample_count": 5,
+      "task_count": 12,
+      "tasks": [
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-2",
+          "truth": "block"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "critical-key-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-dto-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "allow",
+          "task_id": "tests-1",
+          "truth": "tests"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "tests-2",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "tests-3",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "approval",
+          "task_id": "approval-1",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "approval",
+          "task_id": "approval-2",
+          "truth": "approval"
+        },
+        {
+          "impact": true,
+          "prediction": "allow",
+          "task_id": "approval-3",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "allow-1",
+          "truth": "allow"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "allow-2",
+          "truth": "allow"
+        }
+      ],
+      "unsafe_allow_rate": 0.0
+    },
+    {
+      "approval_precision": 1.0,
+      "approval_recall": 0.3333333333333333,
+      "baseline": "Rules Only",
+      "confusion_matrix": {
+        "allow": {
+          "allow": 2,
+          "approval": 0,
+          "block": 0,
+          "tests": 0
+        },
+        "approval": {
+          "allow": 2,
+          "approval": 1,
+          "block": 0,
+          "tests": 0
+        },
+        "block": {
+          "allow": 0,
+          "approval": 0,
+          "block": 4,
+          "tests": 0
+        },
+        "tests": {
+          "allow": 3,
+          "approval": 0,
+          "block": 0,
+          "tests": 0
+        }
+      },
+      "critical_violation_recall": 1.0,
+      "duration_ms_avg": 281.91774240040104,
+      "duration_ms_p50": 266.3702360005118,
+      "duration_ms_p95": 316.56057120053447,
+      "false_block_rate": 0.0,
+      "impact_recall": 0.42857142857142855,
+      "macro_f1": 0.4861111111111111,
+      "mcp_calls": 0,
+      "required_test_recall": 0.0,
+      "sample_count": 5,
+      "task_count": 12,
+      "tasks": [
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-2",
+          "truth": "block"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "critical-key-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-dto-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "allow",
+          "task_id": "tests-1",
+          "truth": "tests"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "tests-2",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "allow",
+          "task_id": "tests-3",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "allow",
+          "task_id": "approval-1",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "approval",
+          "task_id": "approval-2",
+          "truth": "approval"
+        },
+        {
+          "impact": true,
+          "prediction": "allow",
+          "task_id": "approval-3",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "allow-1",
+          "truth": "allow"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "allow-2",
+          "truth": "allow"
+        }
+      ],
+      "unsafe_allow_rate": 0.0
+    },
+    {
+      "approval_precision": 0.0,
+      "approval_recall": 0.0,
+      "baseline": "RAG Only",
+      "confusion_matrix": {
+        "allow": {
+          "allow": 0,
+          "approval": 0,
+          "block": 2,
+          "tests": 0
+        },
+        "approval": {
+          "allow": 0,
+          "approval": 0,
+          "block": 3,
+          "tests": 0
+        },
+        "block": {
+          "allow": 0,
+          "approval": 0,
+          "block": 4,
+          "tests": 0
+        },
+        "tests": {
+          "allow": 0,
+          "approval": 0,
+          "block": 3,
+          "tests": 0
+        }
+      },
+      "critical_violation_recall": 1.0,
+      "duration_ms_avg": 684.8215160003747,
+      "duration_ms_p50": 652.3659110025619,
+      "duration_ms_p95": 812.1551935997559,
+      "false_block_rate": 1.0,
+      "impact_recall": 1.0,
+      "macro_f1": 0.125,
+      "mcp_calls": 0,
+      "required_test_recall": 0.0,
+      "sample_count": 5,
+      "task_count": 12,
+      "tasks": [
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-2",
+          "truth": "block"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "critical-key-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-dto-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "tests-1",
+          "truth": "tests"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "tests-2",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "tests-3",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "approval-1",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "approval-2",
+          "truth": "approval"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "approval-3",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "allow-1",
+          "truth": "allow"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "allow-2",
+          "truth": "allow"
+        }
+      ],
+      "unsafe_allow_rate": 0.0
+    },
+    {
+      "approval_precision": 0.6666666666666666,
+      "approval_recall": 0.6666666666666666,
+      "baseline": "Context",
+      "confusion_matrix": {
+        "allow": {
+          "allow": 0,
+          "approval": 0,
+          "block": 0,
+          "tests": 2
+        },
+        "approval": {
+          "allow": 0,
+          "approval": 2,
+          "block": 0,
+          "tests": 1
+        },
+        "block": {
+          "allow": 0,
+          "approval": 1,
+          "block": 0,
+          "tests": 3
+        },
+        "tests": {
+          "allow": 0,
+          "approval": 0,
+          "block": 0,
+          "tests": 3
+        }
+      },
+      "critical_violation_recall": 0.0,
+      "duration_ms_avg": 234.3855468003312,
+      "duration_ms_p50": 1.928494999447139,
+      "duration_ms_p95": 931.6215372004078,
+      "false_block_rate": 0.0,
+      "impact_recall": 1.0,
+      "macro_f1": 0.29166666666666663,
+      "mcp_calls": 0,
+      "required_test_recall": 1.0,
+      "sample_count": 5,
+      "task_count": 12,
+      "tasks": [
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "critical-ledger-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "critical-ledger-2",
+          "truth": "block"
+        },
+        {
+          "impact": false,
+          "prediction": "approval",
+          "task_id": "critical-key-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "critical-dto-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "tests-1",
+          "truth": "tests"
+        },
+        {
+          "impact": false,
+          "prediction": "tests",
+          "task_id": "tests-2",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "tests-3",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "approval",
+          "task_id": "approval-1",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "approval",
+          "task_id": "approval-2",
+          "truth": "approval"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "approval-3",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "tests",
+          "task_id": "allow-1",
+          "truth": "allow"
+        },
+        {
+          "impact": false,
+          "prediction": "tests",
+          "task_id": "allow-2",
+          "truth": "allow"
+        }
+      ],
+      "unsafe_allow_rate": 0.0
+    },
+    {
+      "approval_precision": 1.0,
+      "approval_recall": 1.0,
+      "baseline": "Full",
+      "confusion_matrix": {
+        "allow": {
+          "allow": 2,
+          "approval": 0,
+          "block": 0,
+          "tests": 0
+        },
+        "approval": {
+          "allow": 0,
+          "approval": 3,
+          "block": 0,
+          "tests": 0
+        },
+        "block": {
+          "allow": 0,
+          "approval": 0,
+          "block": 4,
+          "tests": 0
+        },
+        "tests": {
+          "allow": 0,
+          "approval": 0,
+          "block": 0,
+          "tests": 3
+        }
+      },
+      "critical_violation_recall": 1.0,
+      "duration_ms_avg": 162.61474799975986,
+      "duration_ms_p50": 152.93220300009125,
+      "duration_ms_p95": 196.9532993985922,
+      "false_block_rate": 0.0,
+      "impact_recall": 1.0,
+      "macro_f1": 1.0,
+      "mcp_calls": 0,
+      "required_test_recall": 1.0,
+      "sample_count": 5,
+      "task_count": 12,
+      "tasks": [
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-ledger-2",
+          "truth": "block"
+        },
+        {
+          "impact": false,
+          "prediction": "block",
+          "task_id": "critical-key-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "block",
+          "task_id": "critical-dto-1",
+          "truth": "block"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "tests-1",
+          "truth": "tests"
+        },
+        {
+          "impact": false,
+          "prediction": "tests",
+          "task_id": "tests-2",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "tests",
+          "task_id": "tests-3",
+          "truth": "tests"
+        },
+        {
+          "impact": true,
+          "prediction": "approval",
+          "task_id": "approval-1",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "approval",
+          "task_id": "approval-2",
+          "truth": "approval"
+        },
+        {
+          "impact": true,
+          "prediction": "approval",
+          "task_id": "approval-3",
+          "truth": "approval"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "allow-1",
+          "truth": "allow"
+        },
+        {
+          "impact": false,
+          "prediction": "allow",
+          "task_id": "allow-2",
+          "truth": "allow"
+        }
+      ],
+      "unsafe_allow_rate": 0.0
+    }
+  ],
+  "dataset_revision": "phase5-v2",
+  "offline_notice": "Naive Baseline is a heuristic, not a real agent."
+}
