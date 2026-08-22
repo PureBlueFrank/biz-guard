@@ -1,0 +1,24 @@
+version: holdout-v1
+tasks:
+  - {id: h01, truth: block}
+  - {id: h02, truth: block}
+  - {id: h03, truth: block}
+  - {id: h04, truth: block}
+  - {id: h05, truth: tests}
+  - {id: h06, truth: tests}
+  - {id: h07, truth: tests}
+  - {id: h08, truth: allow}
+  - {id: h09, truth: allow}
+  - {id: h10, truth: approval}
+  - {id: h11, truth: allow}
+  - {id: h12, truth: approval}
+  - {id: h13, truth: block}
+  - {id: h14, truth: block}
+  - {id: h15, truth: approval}
+  - {id: h16, truth: allow}
+  - {id: h17, truth: allow}
+  - {id: h18, truth: block}
+  - {id: h19, truth: allow}
+  - {id: h20, truth: allow}
+  - {id: h21, truth: allow}
+  - {id: h22, truth: approval}

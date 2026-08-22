@@ -1,0 +1,8 @@
+diff --git a/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java b/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java
+--- a/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java
++++ b/coupon-core/src/main/java/com/bizguard/coupon/persistence/DynamicCouponMapper.java
+@@ -10,5 +10,5 @@
+ public class DynamicCouponMapper {
+-    public Object map(String key) { return null; }
++    public Object map(String key) { return null; }
+ }

@@ -1,0 +1,7 @@
+diff --git a/coupon-core/src/main/java/com/bizguard/coupon/api/OldDto.java b/coupon-core/src/main/java/com/bizguard/coupon/api/OldDto.java
+deleted file mode 100644
+--- a/coupon-core/src/main/java/com/bizguard/coupon/api/OldDto.java
++++ /dev/null
+@@ -1,2 +0,0 @@
+-public class OldDto {
+-}

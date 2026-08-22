@@ -1,0 +1,24 @@
+version: holdout-v1
+tasks:
+  - {id: h01, diff: h01-python-idempotency-removed.diff, impact: true, tests_passed: true, prompt: "review idempotency", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h02, diff: h02-python-ledger-order.diff, impact: true, tests_passed: true, prompt: "review ledger order", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h03, diff: h03-python-tx-protection.diff, impact: false, tests_passed: true, prompt: "review transaction", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h04, diff: h04-python-key-argument.diff, impact: true, tests_passed: true, prompt: "review key argument", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h05, diff: h05-python-logging.diff, impact: true, tests_passed: false, prompt: "review logging", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h06, diff: h06-python-recording.diff, impact: false, tests_passed: false, prompt: "review recording", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h07, diff: h07-python-helper-boundary.diff, impact: true, tests_passed: false, prompt: "review helper", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h08, diff: h08-python-helper-rename.diff, impact: false, tests_passed: true, prompt: "review rename", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h09, diff: h09-python-comment.diff, impact: false, tests_passed: true, prompt: "review comment", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h10, diff: h10-python-multi-owner.diff, impact: true, tests_passed: true, owners: [coupon_platform, merchant_checkout], prompt: "review ownership", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h11, diff: h11-python-doc-rename.diff, impact: false, tests_passed: true, prompt: "review docs", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h12, diff: h12-python-policy-uncovered.diff, impact: false, tests_passed: true, prompt: "review refund", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h13, diff: h13-sql-non-transactional.diff, impact: true, tests_passed: true, prompt: "review migration", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h14, diff: h14-avsc-no-version.diff, impact: false, tests_passed: true, prompt: "review schema", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h15, diff: h15-proto-remove-field.diff, impact: true, tests_passed: true, public_contract: true, prompt: "review contract", repositories: [coupon-contract], base_revisions: {coupon-contract: benchmark-base}}
+  - {id: h16, diff: h16-markdown-docs.diff, impact: false, tests_passed: true, prompt: "review readme", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h17, diff: h17-text-notes.diff, impact: false, tests_passed: true, prompt: "review notes", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h18, diff: h18-multi-file-sql-and-decoy.diff, impact: true, tests_passed: true, prompt: "review multi-file", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h19, diff: h19-rename-file.diff, impact: false, tests_passed: true, prompt: "review java rename", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h20, diff: h20-add-file.diff, impact: false, tests_passed: true, prompt: "review java add", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h21, diff: h21-delete-file.diff, impact: false, tests_passed: true, prompt: "review java delete", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}
+  - {id: h22, diff: h22-dynamic-mapper.diff, impact: true, tests_passed: true, prompt: "review dynamic mapper", repositories: [coupon-core], base_revisions: {coupon-core: benchmark-base}}

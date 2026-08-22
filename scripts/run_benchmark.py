@@ -26,9 +26,11 @@ from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest, SearchResult
 from bizguard.knowledge.repository import KnowledgeRepository
 from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
+from bizguard.observability import percentile
 
 
 BASELINES = ("Naive Baseline", "Rules Only", "RAG Only", "Context", "Full")
+_FOUR_STATES = ("allow", "tests", "approval", "block")
 ROOT = Path(__file__).resolve().parents[1]
 TRANSCRIPT = ROOT / "bench" / "ablations" / "agent_transcript.json"
 _OUTCOMES = {
@@ -194,23 +196,73 @@ def _predict(
 def _measure(
     tasks: list[dict[str, Any]], baseline: str, dataset: Path, compiler: ContextCompiler, cache: dict[str, dict[str, Any]]
 ) -> dict[str, Any]:
-    started = time.perf_counter()
+    durations: list[float] = []
+    predictions: dict[str, str] = {}
+    for _ in range(5):
+        started = time.perf_counter()
+        for task in tasks:
+            predictions[task["id"]] = _predict(task, baseline, dataset, compiler, cache)
+        durations.append((time.perf_counter() - started) * 1000)
     rows = [
-        {"task_id": task["id"], "prediction": _predict(task, baseline, dataset, compiler, cache), "truth": task["truth"]}
+        {
+            "task_id": task["id"],
+            "prediction": predictions[task["id"]],
+            "truth": task["truth"],
+            "impact": bool(task["impact"]),
+        }
         for task in tasks
     ]
-    critical = [row for row in rows if row["truth"] == "block"]
-    impact = [task for task in tasks if bool(task["impact"])]
-    predictions = {row["task_id"]: row["prediction"] for row in rows}
+    metrics = _compute_metrics(rows)
+    metrics.update(
+        {
+            "baseline": baseline,
+            "tasks": rows,
+            "task_count": len(rows),
+            "sample_count": len(durations),
+            "duration_ms_avg": sum(durations) / len(durations),
+            "duration_ms_p50": percentile(durations, 50.0),
+            "duration_ms_p95": percentile(durations, 95.0),
+            "mcp_calls": 0,
+        }
+    )
+    return metrics
+
+
+def _compute_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Derive recall, over-blocking, confusion, and F1 from prediction rows."""
+    confusion = {truth: {pred: 0 for pred in _FOUR_STATES} for truth in _FOUR_STATES}
+    for row in rows:
+        truth = str(row["truth"])
+        prediction = str(row["prediction"])
+        if truth in confusion and prediction in confusion[truth]:
+            confusion[truth][prediction] += 1
+
+    per_class: dict[str, dict[str, float]] = {}
+    for state in _FOUR_STATES:
+        tp = confusion[state][state]
+        fp = sum(confusion[truth][state] for truth in _FOUR_STATES) - tp
+        fn = sum(confusion[state].values()) - tp
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        recall = tp / (tp + fn) if (tp + fn) else 0.0
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+        per_class[state] = {"precision": precision, "recall": recall, "f1": f1}
+
+    block_total = sum(confusion["block"].values())
+    non_block_total = len(rows) - block_total
+    false_block = sum(confusion[truth]["block"] for truth in _FOUR_STATES if truth != "block")
+    impact = [row for row in rows if row["impact"]]
+    impact_non_allow = sum(1 for row in impact if row["prediction"] != "allow")
+
     return {
-        "baseline": baseline,
-        "tasks": rows,
-        "task_count": len(rows),
-        "critical_violation_recall": sum(row["prediction"] == "block" for row in critical) / len(critical),
-        "unsafe_allow_rate": sum(row["prediction"] == "allow" for row in critical) / len(critical),
-        "impact_recall": sum(predictions[str(task["id"])] != "allow" for task in impact) / len(impact),
-        "cost_units": sum(len(_read_diff(task, dataset)[1]) for task in tasks),
-        "duration_ms": (time.perf_counter() - started) * 1000,
+        "confusion_matrix": confusion,
+        "macro_f1": sum(per_class[state]["f1"] for state in _FOUR_STATES) / len(_FOUR_STATES),
+        "critical_violation_recall": per_class["block"]["recall"],
+        "unsafe_allow_rate": confusion["block"]["allow"] / block_total if block_total else 0.0,
+        "false_block_rate": false_block / non_block_total if non_block_total else 0.0,
+        "approval_precision": per_class["approval"]["precision"],
+        "approval_recall": per_class["approval"]["recall"],
+        "required_test_recall": per_class["tests"]["recall"],
+        "impact_recall": impact_non_allow / len(impact) if impact else 1.0,
     }
 
 
@@ -323,16 +375,13 @@ def _live_transcript(tasks: list[dict[str, Any]], dataset: Path, revision: objec
 
 
 def run(dataset: Path, offline: bool) -> dict[str, Any]:
-    raw = yaml.safe_load(dataset.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict) or not isinstance(raw.get("tasks"), list):
+    tasks = _load_tasks(dataset)
+    if not tasks:
         raise ValueError("benchmark dataset has no tasks")
-    tasks = cast(list[dict[str, Any]], raw["tasks"])
-    if len(tasks) != 12:
-        raise ValueError("benchmark requires frozen 12 tasks")
     for task in tasks:
         _read_diff(task, dataset)
-    revision = raw.get("version")
-    trajectory = _offline_transcript(tasks, dataset, revision) if offline else _live_transcript(tasks, dataset, revision)
+    revision = _dataset_revision(dataset)
+    trajectory = _offline_trajectory(tasks, dataset, revision) if offline else _live_transcript(tasks, dataset, revision)
     compiler = ContextCompiler(ROOT / "fixtures" / "java-microservices", reuse_index=True)
     return {
         "dataset_revision": revision,
@@ -340,6 +389,40 @@ def run(dataset: Path, offline: bool) -> dict[str, Any]:
         "baselines": [_measure(tasks, baseline, dataset, compiler, {}) for baseline in BASELINES],
         "agent_trajectory": trajectory,
     }
+
+
+def _offline_trajectory(tasks: list[dict[str, Any]], dataset: Path, revision: object) -> dict[str, Any] | None:
+    """Return the recorded trajectory only when it targets this dataset's tasks."""
+    transcript = json.loads(TRANSCRIPT.read_text(encoding="utf-8"))
+    if not isinstance(transcript, dict):
+        return None
+    task_id = transcript.get("task_id")
+    if not any(str(item["id"]) == str(task_id) for item in tasks):
+        return None
+    return _offline_transcript(tasks, dataset, revision)
+
+
+def _load_tasks(dataset: Path) -> list[dict[str, Any]]:
+    raw = yaml.safe_load(dataset.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or not isinstance(raw.get("tasks"), list):
+        raise ValueError("benchmark dataset has no tasks")
+    tasks = cast(list[dict[str, Any]], raw["tasks"])
+    truth_file = dataset.parent / "truth.yaml"
+    if truth_file.is_file():
+        truth_raw = yaml.safe_load(truth_file.read_text(encoding="utf-8"))
+        truth_map = {
+            str(item["id"]): item["truth"]
+            for item in truth_raw["tasks"]
+            if isinstance(item, dict) and "id" in item and "truth" in item
+        }
+        for task in tasks:
+            task["truth"] = truth_map[str(task["id"])]
+    return tasks
+
+
+def _dataset_revision(dataset: Path) -> object:
+    raw = yaml.safe_load(dataset.read_text(encoding="utf-8"))
+    return raw.get("version") if isinstance(raw, dict) else None
 
 
 def main() -> int:

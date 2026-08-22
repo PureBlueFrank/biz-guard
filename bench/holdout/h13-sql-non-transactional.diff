@@ -1,0 +1,6 @@
+diff --git a/coupon-core/src/main/resources/db/V2__ledger.sql b/coupon-core/src/main/resources/db/V2__ledger.sql
+--- a/coupon-core/src/main/resources/db/V2__ledger.sql
++++ b/coupon-core/src/main/resources/db/V2__ledger.sql
+@@ -1,1 +1,1 @@
+-UPDATE ledger SET status='SUCCESS';
++UPDATE ledger SET status='FAILED';

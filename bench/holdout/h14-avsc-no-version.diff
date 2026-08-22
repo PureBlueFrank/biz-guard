@@ -1,0 +1,7 @@
+diff --git a/coupon-core/src/main/avro/CouponEvent.avsc b/coupon-core/src/main/avro/CouponEvent.avsc
+--- a/coupon-core/src/main/avro/CouponEvent.avsc
++++ b/coupon-core/src/main/avro/CouponEvent.avsc
+@@ -1,2 +1,2 @@
+ type: record
+-name: CouponEvent
++name: CouponEventV2

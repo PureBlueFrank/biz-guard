@@ -1,0 +1,12 @@
+diff --git a/coupon-core/src/main/resources/db/V3__fix.sql b/coupon-core/src/main/resources/db/V3__fix.sql
+--- a/coupon-core/src/main/resources/db/V3__fix.sql
++++ b/coupon-core/src/main/resources/db/V3__fix.sql
+@@ -1,1 +1,1 @@
+-DELETE FROM ledger WHERE status='SUCCESS';
++DELETE FROM ledger WHERE status='FAILED';
+diff --git a/docs/decoy.md b/docs/decoy.md
+--- a/docs/decoy.md
++++ b/docs/decoy.md
+@@ -1,1 +1,1 @@
+-note
++note v2

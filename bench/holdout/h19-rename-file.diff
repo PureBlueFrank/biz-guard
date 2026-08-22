@@ -1,0 +1,9 @@
+diff --git a/coupon-core/src/main/java/com/bizguard/coupon/api/OldName.java b/coupon-core/src/main/java/com/bizguard/coupon/api/NewName.java
+similarity index 100%
+rename from coupon-core/src/main/java/com/bizguard/coupon/api/OldName.java
+rename to coupon-core/src/main/java/com/bizguard/coupon/api/NewName.java
+--- a/coupon-core/src/main/java/com/bizguard/coupon/api/OldName.java
++++ b/coupon-core/src/main/java/com/bizguard/coupon/api/NewName.java
+@@ -1,2 +1,2 @@
+ public class OldName {
+ }

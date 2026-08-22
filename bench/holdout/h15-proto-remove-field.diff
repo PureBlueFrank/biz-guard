@@ -1,0 +1,9 @@
+diff --git a/coupon-contract/src/main/resources/coupon.proto b/coupon-contract/src/main/resources/coupon.proto
+--- a/coupon-contract/src/main/resources/coupon.proto
++++ b/coupon-contract/src/main/resources/coupon.proto
+@@ -1,5 +1,4 @@
+ syntax = "proto3";
+ message RedeemRequest {
+-  string id = 1;
+   string coupon_code = 2;
+ }

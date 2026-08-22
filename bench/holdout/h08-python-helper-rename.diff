@@ -1,0 +1,12 @@
+diff --git a/sample/coupon-service/redeem_service.py b/sample/coupon-service/redeem_service.py
+--- a/sample/coupon-service/redeem_service.py
++++ b/sample/coupon-service/redeem_service.py
+@@ -39,5 +39,6 @@ class RedeemService:
+ 
+     @transaction
+     def redeem(self, coupon_id: str, idempotency_key: str) -> None:
+-        IdempotencyStore.check(idempotency_key)
+-        self.ledger.redeem(coupon_id)
++        redemption_coupon_id = coupon_id
++        IdempotencyStore.check(idempotency_key)
++        self.ledger.redeem(redemption_coupon_id)

@@ -1,0 +1,7 @@
+diff --git a/coupon-core/src/main/java/com/bizguard/coupon/api/NewDto.java b/coupon-core/src/main/java/com/bizguard/coupon/api/NewDto.java
+new file mode 100644
+--- /dev/null
++++ b/coupon-core/src/main/java/com/bizguard/coupon/api/NewDto.java
+@@ -0,0 +1,2 @@
++public class NewDto {
++}
