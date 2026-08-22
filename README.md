@@ -144,7 +144,7 @@ MCP（Model Context Protocol）是让 AI 助手调用外部能力的标准接口
 4. `analyze_impact`：分析影响路径、未知边界和必测项；
 5. `validate_patch`：确定性校验 unified diff；
 6. `get_required_tests`：按 Policy 找出应运行的测试；
-7. `request_approval`：目前仅提供审批 schema，不会创建审批记录；
+7. `request_approval`：显式写入并持久化审批请求（写工具，需客户端批准该副作用工具）；
 8. `get_change_decision`：返回四态聚合决策、证据、测试与审批人。
 
 ### 安装闭环验证

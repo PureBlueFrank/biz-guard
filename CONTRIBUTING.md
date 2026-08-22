@@ -49,7 +49,7 @@ Mandatory 内容本身超过 800、1200、2000 或 4000 的所选预算，编译
 4. `analyze_impact`：返回影响路径、未知边界和必测项；
 5. `validate_patch`：确定性校验 unified diff；
 6. `get_required_tests`：从语义 catalog 选择必测项；
-7. `request_approval`：当前仅暴露 schema，并明确拒绝创建审批记录；
+7. `request_approval`：显式写入并持久化审批请求（写工具，需客户端批准副作用工具）；
 8. `get_change_decision`：返回四态聚合决策及证据。
 
 读工具不得写工作区或调用外部服务。新增或修改工具时，应同时测试输入 schema、真实
