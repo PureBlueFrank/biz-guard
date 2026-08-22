@@ -119,5 +119,10 @@ def test_zhipu_embedding_live_call_when_local_credentials_are_available() -> Non
         vectors = client.embed(["优惠券核销幂等性"])
     except httpx.RequestError as error:
         pytest.skip(f"Zhipu embedding endpoint is unavailable: {error}")
+    except httpx.HTTPStatusError as error:
+        pytest.skip(
+            f"Zhipu embedding credentials rejected (HTTP {error.response.status_code}); "
+            "endpoint unavailable"
+        )
     assert len(vectors) == 1
     assert len(vectors[0]) == 2048
