@@ -2,6 +2,7 @@
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 import pytest
 from mcp.server.fastmcp.exceptions import ToolError
@@ -18,6 +19,11 @@ from bizguard.symbols.service import SymbolService
 
 
 ROOT = Path(__file__).parent.parent
+
+
+def _entry_ids(payload: dict[str, object]) -> set[str]:
+    entries = cast(list[dict[str, object]], payload["entries"])
+    return {str(item["id"]) for item in entries}
 
 
 def _call(name: str, arguments: dict[str, object]) -> dict[str, object]:
@@ -58,8 +64,15 @@ def test_prepare_change_delegates_to_context_compiler() -> None:
     assert _call("prepare_change", arguments)["task"] == "status"
 
 
-def test_search_tool_delegates_to_hybrid_search() -> None:
-    arguments: dict[str, object] = {"query": "status", "scope": "coupon_redemption", "revision": "semantic-seed-v1", "caller_roles": ["engineering"]}
+def test_search_tool_uses_server_authenticated_roles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "engineering")
+    arguments: dict[str, object] = {
+        "query": "status",
+        "scope": "coupon_redemption",
+        "revision": "semantic-seed-v1",
+    }
     repository = KnowledgeRepository.memory()
     try:
         ingest_directory(ROOT / "knowledge/published", repository)
@@ -67,6 +80,68 @@ def test_search_tool_delegates_to_hybrid_search() -> None:
     finally:
         repository.close()
     assert _call("search_team_knowledge", arguments) == expected
+
+
+def test_search_tool_caller_cannot_escalate_acl_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "engineering")
+    result = _call(
+        "search_team_knowledge",
+        {
+            "query": "restricted incident",
+            "scope": "coupon_redemption",
+            "revision": "semantic-seed-v1",
+        },
+    )
+    assert "restricted-incident" not in _entry_ids(result)
+    spoofed = _call(
+        "search_team_knowledge",
+        {
+            "query": "restricted incident",
+            "scope": "coupon_redemption",
+            "revision": "semantic-seed-v1",
+            "caller_roles": ["security"],
+        },
+    )
+    assert "restricted-incident" not in _entry_ids(spoofed)
+
+
+def test_prepare_change_caller_cannot_select_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "engineering")
+    prepared = _call(
+        "prepare_change",
+        {
+            "task": "restricted incident",
+            "repos": ["coupon-core"],
+            "base_revisions": {
+                "coupon-core": "fixture-coupon-core-base",
+                "__index__": "phase3-fixture-v1",
+            },
+            "principal": "security",
+        },
+    )
+    assert prepared["principal"] == "engineering"
+
+
+def test_change_context_cannot_cross_authenticated_role_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agents_mcp.server as server
+
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "security")
+    context_id = _prepare_context(tmp_path, monkeypatch, "restricted incident")
+    monkeypatch.setenv("BIZGUARD_CALLER_ROLES", "engineering")
+    with pytest.raises(ToolError, match="resource unavailable"):
+        server.change_resource(context_id)
+    diff_text = (ROOT / "sample/diffs/diff_normal_1.diff").read_text(encoding="utf-8")
+    with pytest.raises(ToolError, match="change context unavailable"):
+        _call(
+            "get_change_decision",
+            {"diff_text": diff_text, "change_context_id": context_id},
+        )
 
 
 def test_explain_symbol_delegates_to_symbol_service() -> None:

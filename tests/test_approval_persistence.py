@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from bizguard.change.evaluator import ChangeEvaluator
@@ -129,6 +130,39 @@ def test_approval_for_an_old_diff_cannot_release_a_new_diff(tmp_path: Path) -> N
     store.close()
 
 
+def test_unrelated_cosigner_cannot_satisfy_required_owner(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1] / "fixtures/java-microservices"
+    diff = (Path(__file__).parents[1] / "bench/fixtures/phase5/dynamic-mapper.diff").read_text(
+        encoding="utf-8"
+    )
+    store = SqliteApprovalStore(tmp_path / "approvals.sqlite3")
+    evaluator = ChangeEvaluator(root, approval_store=store)
+    pending = evaluator.evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=root, tests_passed=True)
+    )
+    request = ApprovalService(store=store).create(
+        ApprovalRequest(
+            change_context_id="ctx-wrong-cosigner",
+            policy_revision="phase5",
+            decision_fingerprint=pending.decision_fingerprint,
+            approvers=("coupon_platform", "engineering"),
+            required_cosigns=1,
+        )
+    )
+    ApprovalService(store=store).approve(request, "engineering")
+    decision = evaluator.evaluate(
+        EvaluationRequest(
+            diff_text=diff,
+            repository_root=root,
+            tests_passed=True,
+            change_context_id="ctx-wrong-cosigner",
+        )
+    )
+    assert decision.decision.value == "REQUIRE_APPROVAL"
+    assert decision.approval_state == "approver_mismatch"
+    store.close()
+
+
 def test_delegate_and_original_share_one_cosign_slot() -> None:
     service = ApprovalService()
     request = service.create(_request())
@@ -152,3 +186,16 @@ def test_evidence_refs_and_updated_at_are_persisted(tmp_path: Path) -> None:
     assert restored.evidence_refs == ["test://run"]
     assert restored.updated_at is not None
     reopened.close()
+
+
+def test_store_supports_concurrent_http_workers(tmp_path: Path) -> None:
+    store = SqliteApprovalStore(tmp_path / "approvals.db")
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(
+            executor.map(
+                lambda index: store.append_event("ctx-concurrent", f'{{"index":{index}}}'),
+                range(20),
+            )
+        )
+    assert len(store.events("ctx-concurrent")) == 20
+    store.close()

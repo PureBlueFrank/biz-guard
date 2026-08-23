@@ -17,7 +17,7 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
 run_check() {
-    "$PYTHON_BIN" -m bizguard.cli check --diff "$1" --tests-complete
+    "$PYTHON_BIN" -m bizguard.cli check --diff "$1"
 }
 
 assert_decision() {
@@ -95,7 +95,14 @@ printf '\n%s\n' '场景 2：业务规则违规（预期 BLOCK，退出码 1）'
 expect_check 1 BLOCK "$PROJECT_ROOT/sample/diffs/diff_violation_1.diff"
 
 printf '\n%s\n' '场景 3：低风险正常变更（预期 ALLOW，退出码 0）'
-expect_check 0 ALLOW "$PROJECT_ROOT/sample/diffs/diff_normal_1.diff"
+normal_output=$(cd "$PROJECT_ROOT" && "$PYTHON_BIN" -m bizguard.ci.runner \
+    --diff sample/diffs/diff_normal_1.diff \
+    --base-revisions bench/fixtures/phase3-revisions.yaml \
+    --repository-root fixtures/java-microservices \
+    --test-root fixtures/java-microservices \
+    --json)
+assert_decision "$normal_output" ALLOW
+printf '%s\n' "$normal_output"
 
 printf '\n%s\n' '场景 4：非法输入（预期 CHECK_INCOMPLETE，退出码 2）'
 missing_diff="$PROJECT_ROOT/sample/diffs/does-not-exist.diff"
@@ -104,10 +111,11 @@ expect_check 2 CHECK_INCOMPLETE "$missing_diff"
 
 printf '\n%s\n' '场景 5：动态映射未知边界（预期 REQUIRE_APPROVAL）'
 set +e
-dynamic_output=$(cd "$PROJECT_ROOT" && "$PYTHON_BIN" -m bizguard.ci.check \
+dynamic_output=$(cd "$PROJECT_ROOT" && "$PYTHON_BIN" -m bizguard.ci.runner \
     --diff bench/fixtures/phase5/dynamic-mapper.diff \
     --base-revisions bench/fixtures/phase3-revisions.yaml \
-    --tests-complete \
+    --repository-root fixtures/java-microservices \
+    --test-root fixtures/java-microservices \
     --json)
 dynamic_code=$?
 set -e

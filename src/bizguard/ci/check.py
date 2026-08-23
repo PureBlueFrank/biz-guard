@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
-from pydantic import ValidationError
 
 from bizguard.change.evaluator import ChangeEvaluator
 from bizguard.change.models import EvaluationRequest, TestEvidence
@@ -64,8 +63,6 @@ def main() -> int:
     parser.add_argument("--diff", type=Path, required=True)
     parser.add_argument("--base-revisions", type=Path, required=True)
     parser.add_argument("--repository-root", type=Path, default=None)
-    parser.add_argument("--tests-complete", action="store_true")
-    parser.add_argument("--test-evidence", type=Path)
     parser.add_argument("--change-context-id")
     parser.add_argument("--approval-db", type=Path)
     parser.add_argument("--audit-log", type=Path)
@@ -81,25 +78,12 @@ def main() -> int:
         isinstance(key, str) for key in raw_revisions
     ):
         return 2
-    evidence: list[TestEvidence] = []
-    if args.test_evidence is not None:
-        if not args.test_evidence.is_file():
-            return 2
-        try:
-            raw_evidence = json.loads(args.test_evidence.read_text(encoding="utf-8"))
-            if not isinstance(raw_evidence, list):
-                return 2
-            evidence = [TestEvidence.model_validate(item) for item in raw_evidence]
-        except (OSError, json.JSONDecodeError, ValidationError):
-            return 2
     store = SqliteApprovalStore(args.approval_db) if args.approval_db is not None else None
     try:
         result = evaluate(
             args.diff.read_text(encoding="utf-8"),
             raw_revisions,
             args.repository_root,
-            tests_passed=True if args.tests_complete else None,
-            test_evidence=evidence,
             change_context_id=args.change_context_id,
             approval_store=store,
         )

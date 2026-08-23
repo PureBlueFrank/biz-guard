@@ -11,8 +11,8 @@ import pytest
 import yaml  # type: ignore[import-untyped]
 
 from bizguard.change.evaluator import ChangeEvaluator
-from bizguard.change.models import EvaluationRequest
-from bizguard.ci.check import gate_exit_code
+from bizguard.change.models import EvaluationRequest, TestEvidence as EvidenceRecord
+from bizguard.ci.check import evaluate, gate_exit_code
 from bizguard.workflow.approval import ApprovalRequest, ApprovalService
 from bizguard.workflow.store import SqliteApprovalStore
 
@@ -56,7 +56,7 @@ def test_block_fixture_returns_exit_one() -> None:
 
 def test_unapproved_approval_fixture_returns_non_zero() -> None:
     diff = ROOT / "bench" / "fixtures" / "phase5" / "dynamic-mapper.diff"
-    completed = _run_gate(diff, None, "--tests-complete")
+    completed = _run_gate(diff)
     assert completed.returncode == 1
     assert json.loads(completed.stdout)["decision"] == "REQUIRE_APPROVAL"
 
@@ -68,7 +68,14 @@ def test_missing_test_evidence_never_becomes_allow() -> None:
     assert json.loads(completed.stdout)["decision"] == "ALLOW_WITH_TESTS"
 
 
-def test_persisted_approval_releases_the_real_ci_decision(tmp_path: Path) -> None:
+def test_ci_rejects_global_tests_complete_claim() -> None:
+    diff = ROOT / "sample" / "diffs" / "diff_normal_1.diff"
+    completed = _run_gate(diff, None, "--tests-complete")
+    assert completed.returncode == 2
+    assert "ALLOW" not in completed.stdout
+
+
+def test_persisted_approval_without_test_evidence_remains_blocked(tmp_path: Path) -> None:
     diff = ROOT / "bench" / "fixtures" / "phase5" / "dynamic-mapper.diff"
     approval_db = tmp_path / "approvals.sqlite3"
     store = SqliteApprovalStore(approval_db)
@@ -96,7 +103,6 @@ def test_persisted_approval_releases_the_real_ci_decision(tmp_path: Path) -> Non
     completed = _run_gate(
         diff,
         None,
-        "--tests-complete",
         "--change-context-id",
         "ctx-ci-approved",
         "--approval-db",
@@ -104,9 +110,9 @@ def test_persisted_approval_releases_the_real_ci_decision(tmp_path: Path) -> Non
         "--repository-root",
         str(root),
     )
-    assert completed.returncode == 0, completed.stderr
+    assert completed.returncode == 1, completed.stderr
     payload = json.loads(completed.stdout)
-    assert payload["decision"] == "ALLOW"
+    assert payload["decision"] == "ALLOW_WITH_TESTS"
     assert payload["approval_state"] == "approved"
 
 
@@ -148,40 +154,36 @@ def test_unparsable_diff_never_passes(tmp_path: Path) -> None:
     assert completed.returncode != 0
 
 
-def test_malformed_test_evidence_fails_closed_without_traceback(tmp_path: Path) -> None:
+def test_untrusted_test_evidence_argument_is_rejected(tmp_path: Path) -> None:
     evidence = tmp_path / "evidence.json"
-    evidence.write_text("{not-json", encoding="utf-8")
+    evidence.write_text("[]", encoding="utf-8")
     diff = ROOT / "sample/diffs/diff_normal_1.diff"
     completed = _run_gate(diff, None, "--test-evidence", str(evidence))
     assert completed.returncode == 2
     assert "Traceback" not in completed.stderr
 
 
-def test_revision_bound_test_evidence_releases_only_the_matching_change(tmp_path: Path) -> None:
+def test_revision_bound_test_evidence_releases_only_the_matching_change() -> None:
     diff = ROOT / "sample/diffs/diff_normal_1.diff"
-    evidence = tmp_path / "evidence.json"
-    payload = [
-        {
-            "test_id": test_id,
-            "passed": True,
-            "revision": "phase3-fixture-v1",
-            "evidence_uri": f"ci://run/{test_id}",
-        }
+    revisions = yaml.safe_load(REVISIONS.read_text(encoding="utf-8"))
+    evidence = [
+        EvidenceRecord(
+            test_id=test_id,
+            passed=True,
+            revision="phase3-fixture-v1",
+            evidence_uri=f"ci://run/{test_id}",
+        )
         for test_id in (
             "coupon-core-redeem-idempotency-test",
             "merchant-service-coupon-status-test",
         )
     ]
-    evidence.write_text(json.dumps(payload), encoding="utf-8")
-    matching = _run_gate(diff, None, "--test-evidence", str(evidence))
-    assert matching.returncode == 0
-    assert json.loads(matching.stdout)["decision"] == "ALLOW"
+    matching = evaluate(diff.read_text(encoding="utf-8"), revisions, test_evidence=evidence)
+    assert matching["decision"] == "ALLOW"
 
-    payload[0]["revision"] = "different-revision"
-    evidence.write_text(json.dumps(payload), encoding="utf-8")
-    stale = _run_gate(diff, None, "--test-evidence", str(evidence))
-    assert stale.returncode == 1
-    assert json.loads(stale.stdout)["decision"] == "ALLOW_WITH_TESTS"
+    evidence[0] = evidence[0].model_copy(update={"revision": "different-revision"})
+    stale = evaluate(diff.read_text(encoding="utf-8"), revisions, test_evidence=evidence)
+    assert stale["decision"] == "ALLOW_WITH_TESTS"
 
 
 def test_ci_writes_metadata_only_audit_record(tmp_path: Path) -> None:
@@ -190,12 +192,26 @@ def test_ci_writes_metadata_only_audit_record(tmp_path: Path) -> None:
     completed = _run_gate(
         diff,
         None,
-        "--tests-complete",
         "--audit-log",
         str(audit),
     )
-    assert completed.returncode == 0
+    assert completed.returncode == 1
     record = json.loads(audit.read_text(encoding="utf-8"))
     assert record["event"] == "ci_decision"
-    assert record["details"]["decision"] == "ALLOW"
+    assert record["details"]["decision"] == "ALLOW_WITH_TESTS"
     assert "diff_text" not in record["details"]
+
+
+def test_unresolved_java_capability_fails_closed_without_traceback() -> None:
+    diff = ROOT / "bench/fixtures/phase3/db-idempotency.diff"
+    completed = _run_gate(
+        diff,
+        None,
+        "--repository-root",
+        str(ROOT / "fixtures/java-microservices"),
+    )
+    assert completed.returncode == 1
+    assert "Traceback" not in completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["decision"] == "REQUIRE_APPROVAL"
+    assert any(item["id"].startswith("impact:CAPABILITY_UNRESOLVED:") for item in payload["findings"])

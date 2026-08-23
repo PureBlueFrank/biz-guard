@@ -9,6 +9,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - run: pip install -e .[dev]
       - run: python -m ruff check src tests agents_mcp
       - run: python -m ruff check --select D101,D103 src/bizguard agents_mcp
@@ -25,21 +29,40 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - run: pip install -e .[dev]
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Generate PR diff and base revisions
         run: |
           git fetch origin "${{ github.event.pull_request.base.sha }}" --depth=1
           git diff "${{ github.event.pull_request.base.sha }}" HEAD > /tmp/pr.diff
           printf 'revision: %s\n' "${{ github.event.pull_request.base.sha }}" > /tmp/base-revisions.yaml
+      - name: Install trusted BizGuard engine from base revision
+        run: |
+          mkdir -p "$RUNNER_TEMP/bizguard-trusted"
+          git archive "${{ github.event.pull_request.base.sha }}" | tar -x -C "$RUNNER_TEMP/bizguard-trusted"
+          python -m venv "$RUNNER_TEMP/bizguard-venv"
+          "$RUNNER_TEMP/bizguard-venv/bin/pip" install \
+            --constraint "$RUNNER_TEMP/bizguard-trusted/requirements-production.lock" \
+            "$RUNNER_TEMP/bizguard-trusted"
       - name: BizGuard safety gate
         id: gate
+        env:
+          BIZGUARD_CATALOG_PATH: ${{ runner.temp }}/bizguard-trusted/src/bizguard/semantic/catalog.yaml
+          BIZGUARD_POLICY_REGISTRY_PATH: ${{ runner.temp }}/bizguard-trusted/policy/phase5-registry.yaml
+          BIZGUARD_CONTRACT_REGISTRY_PATH: ${{ runner.temp }}/bizguard-trusted/registry/contracts.yaml
+          BIZGUARD_INVARIANTS_PATH: ${{ runner.temp }}/bizguard-trusted/policy/invariants.yaml
+          BIZGUARD_KNOWLEDGE_ROOT: ${{ runner.temp }}/bizguard-trusted/knowledge/published
+          BIZGUARD_INVARIANT_KNOWLEDGE_ROOT: ${{ runner.temp }}/bizguard-trusted/knowledge
         run: |
           set +e
-          python -m bizguard.ci.check \
+          "$RUNNER_TEMP/bizguard-venv/bin/python" -m bizguard.ci.runner \
             --diff /tmp/pr.diff \
             --base-revisions /tmp/base-revisions.yaml \
             --repository-root . \
-            --tests-complete \
+            --test-root fixtures/java-microservices \
+            --test-evidence-out /tmp/bizguard-test-evidence.json \
             --audit-log /tmp/bizguard-audit.json \
             --json > /tmp/bizguard-result.json
           code=$?
@@ -47,18 +70,18 @@ jobs:
           {
             echo "## BizGuard decision"
             python - /tmp/bizguard-result.json <<'PY'
-import json
-import sys
-payload = json.load(open(sys.argv[1]))
-print(f"- decision: `{payload.get('decision')}`")
-print(f"- rationale: {payload.get('rationale')}")
-print(f"- required approvers: {payload.get('required_approvers')}")
-print(f"- evidence: {payload.get('evidence')}")
-for test in payload.get("required_tests", []):
-    print(f"- required test: {test.get('id')}")
-for finding in payload.get("findings", []):
-    print(f"- finding: {finding.get('id')} -> {finding.get('effect')}")
-PY
+          import json
+          import sys
+          payload = json.load(open(sys.argv[1]))
+          print(f"- decision: `{payload.get('decision')}`")
+          print(f"- rationale: {payload.get('rationale')}")
+          print(f"- required approvers: {payload.get('required_approvers')}")
+          print(f"- evidence: {payload.get('evidence')}")
+          for test in payload.get("required_tests", []):
+              print(f"- required test: {test.get('id')}")
+          for finding in payload.get("findings", []):
+              print(f"- finding: {finding.get('id')} -> {finding.get('effect')}")
+          PY
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$code"
       - name: Upload BizGuard evidence
@@ -69,3 +92,4 @@ PY
           path: |
             /tmp/bizguard-result.json
             /tmp/bizguard-audit.json
+            /tmp/bizguard-test-evidence.json

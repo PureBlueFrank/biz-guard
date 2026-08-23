@@ -70,7 +70,13 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
-def evaluate_change(diff_text: str) -> ChangeSafetyCard:
+def evaluate_change(
+    diff_text: str,
+    *,
+    contract_registry_path: Path | None = None,
+    invariants_path: Path | None = None,
+    knowledge_root: Path | None = None,
+) -> ChangeSafetyCard:
     """Evaluate a diff in this fixed order: parse, coverage, retrieval, reconstruct, AST.
 
     Service ownership comes from each parsed file's non-null new path (or old
@@ -82,14 +88,28 @@ def evaluate_change(diff_text: str) -> ChangeSafetyCard:
         parsed_diff = parse(diff_text)
     except DiffParseError as exc:
         return _incomplete(FaultCode.DIFF_PARSE, str(exc))
-    return evaluate_parsed(parsed_diff)
+    return evaluate_parsed(
+        parsed_diff,
+        contract_registry_path=contract_registry_path,
+        invariants_path=invariants_path,
+        knowledge_root=knowledge_root,
+    )
 
 
-def evaluate_parsed(parsed_diff: ParsedDiff) -> ChangeSafetyCard:
+def evaluate_parsed(
+    parsed_diff: ParsedDiff,
+    *,
+    contract_registry_path: Path | None = None,
+    invariants_path: Path | None = None,
+    knowledge_root: Path | None = None,
+) -> ChangeSafetyCard:
     """Evaluate an already-parsed diff through the Python invariant pipeline."""
+    contract_path = contract_registry_path or _PROJECT_ROOT / "registry" / "contracts.yaml"
+    invariant_path = invariants_path or _PROJECT_ROOT / "policy" / "invariants.yaml"
+    documents_path = knowledge_root or _PROJECT_ROOT / "knowledge"
     try:
-        registry = load_contract_registry(_PROJECT_ROOT / "registry" / "contracts.yaml")
-        invariants = load_invariants(_PROJECT_ROOT / "policy" / "invariants.yaml")
+        registry = load_contract_registry(contract_path)
+        invariants = load_invariants(invariant_path, contract_path, documents_path)
     except (OSError, PolicyLoadError, ValueError) as exc:
         return _incomplete(FaultCode.POLICY_UNCOVERED, f"无法加载 Policy 契约: {exc}")
 
@@ -108,7 +128,7 @@ def evaluate_parsed(parsed_diff: ParsedDiff) -> ChangeSafetyCard:
         )
 
     try:
-        documents = load_knowledge_documents(_PROJECT_ROOT / "knowledge")
+        documents = load_knowledge_documents(documents_path)
         evidence = inject_full_text(parsed_diff, registry, documents)
     except (OSError, ValueError) as exc:
         return _incomplete(FaultCode.RETRIEVAL_EMPTY, f"检索资料不可用: {exc}")

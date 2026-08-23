@@ -16,7 +16,7 @@ from bizguard.decision import (
     FindingStatus,
 )
 from bizguard.change.evaluator import ChangeEvaluator
-from bizguard.change.models import ChangeDecision, EvaluationRequest, TestEvidence
+from bizguard.change.models import ChangeDecision, EvaluationRequest
 from bizguard.connectors import connect
 from bizguard.decision.v2 import DecisionState
 from bizguard.context.compiler import ContextCompiler, ContextPack
@@ -37,13 +37,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_parser.add_argument("--diff", type=Path, required=True)
     check_parser.add_argument("--repository-root", type=Path, default=None)
     check_parser.add_argument("--base-revisions", type=Path, default=None)
-    check_parser.add_argument("--tests-complete", action="store_true")
-    check_parser.add_argument("--test-evidence", type=Path)
     check_parser.add_argument("--change-context-id")
     check_parser.add_argument("--approval-db", type=Path)
     doctor_parser = subparsers.add_parser("doctor")
     doctor_parser.add_argument("--json", action="store_true")
     doctor_parser.add_argument("--repository", type=Path, default=None)
+    doctor_parser.add_argument("--production", action="store_true")
     impact_parser = subparsers.add_parser("impact")
     impact_subparsers = impact_parser.add_subparsers(dest="impact_command")
     analyze_parser = impact_subparsers.add_parser("analyze")
@@ -147,6 +146,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _doctor(arguments: argparse.Namespace) -> int:
     """Diagnose local prerequisites and report ok / degraded / failed per check."""
+    if arguments.production:
+        return _production_doctor(arguments.json)
     root = arguments.repository or _project_root()
     checks = {
         "python": _check_python(),
@@ -154,7 +155,7 @@ def _doctor(arguments: argparse.Namespace) -> int:
         "catalog": _status((root / "src/bizguard/semantic/catalog.yaml").is_file()),
         "mcp": _check_mcp(),
         "store": _check_store(root),
-        "graph": _check_graph(root),
+        "graph": _check_graph(root / "fixtures/java-microservices"),
         "ci_workflow": _status((root / ".github" / "workflows" / "bizguard.yml").is_file()),
         "agent_config": _check_agent_config(root),
     }
@@ -165,12 +166,77 @@ def _doctor(arguments: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _production_doctor(json_output: bool) -> int:
+    """Check only runtime dependencies required by a deployed service."""
+    from bizguard.production import ProductionSettings
+
+    try:
+        settings = ProductionSettings.from_env()
+    except ValueError:
+        checks = {
+            "python": _check_python(),
+            "production_config": "failed",
+            "mcp": _check_mcp(),
+        }
+    else:
+        checks = {
+            "python": _check_python(),
+            "production_config": "ok",
+            "governance": _check_governance(settings.governance),
+            "mcp": _check_mcp(),
+            "store": _check_store(settings.repository_root),
+            "graph": _check_graph(settings.repository_root),
+        }
+    ok = all(status != "failed" for status in checks.values())
+    degraded = any(status == "degraded" for status in checks.values())
+    payload = {"ok": ok, "degraded": degraded, "checks": checks}
+    print(json.dumps(payload, sort_keys=True) if json_output else ("ok" if ok else "failed"))
+    return 0 if ok else 1
+
+
 def _status(condition: bool) -> str:
     return "ok" if condition else "failed"
 
 
 def _check_python() -> str:
     return "ok" if sys.version_info >= (3, 12) else "failed"
+
+
+def _check_production_config() -> str:
+    from bizguard.production import ProductionSettings
+
+    try:
+        settings = ProductionSettings.from_env()
+    except ValueError:
+        return "failed"
+    return "ok" if settings.transport == "streamable-http" and all(settings.readiness().values()) else "failed"
+
+
+def _check_governance(governance: object) -> str:
+    """Parse every configured governance source instead of checking paths only."""
+    from bizguard.policy.invariants import load_invariants
+    from bizguard.policy.registry import load_registry
+    from bizguard.production import GovernancePaths
+    from bizguard.rag.injector import load_contract_registry
+
+    if not isinstance(governance, GovernancePaths):
+        return "failed"
+    repository = KnowledgeRepository.memory()
+    try:
+        load_catalog(governance.catalog)
+        load_registry(governance.policy_registry)
+        load_contract_registry(governance.contract_registry)
+        load_invariants(
+            governance.invariants,
+            governance.contract_registry,
+            governance.invariant_knowledge,
+        )
+        entries = ingest_directory(governance.knowledge, repository)
+        return "ok" if entries else "failed"
+    except (OSError, ValueError):
+        return "failed"
+    finally:
+        repository.close()
 
 
 def _check_mcp() -> str:
@@ -200,11 +266,11 @@ def _check_store(root: Path) -> str:
     return "ok"
 
 
-def _check_graph(root: Path) -> str:
+def _check_graph(repositories_root: Path) -> str:
     try:
         from bizguard.graph.indexer import index
 
-        index(root / "fixtures" / "java-microservices", "phase3-fixture-v1")
+        index(repositories_root, "production-readiness")
     except Exception:
         return "failed"
     return "ok"
@@ -423,12 +489,6 @@ def _evaluate_change(arguments: argparse.Namespace, diff_text: str) -> ChangeDec
         raw = yaml.safe_load(arguments.base_revisions.read_text(encoding="utf-8")) or {}
         if isinstance(raw, dict):
             base_revisions = raw
-    evidence: list[TestEvidence] = []
-    if arguments.test_evidence is not None:
-        raw_evidence = json.loads(arguments.test_evidence.read_text(encoding="utf-8"))
-        if not isinstance(raw_evidence, list):
-            raise ValueError("test evidence must be a JSON list")
-        evidence = [TestEvidence.model_validate(item) for item in raw_evidence]
     from bizguard.workflow.store import SqliteApprovalStore
 
     store = SqliteApprovalStore(arguments.approval_db) if arguments.approval_db else None
@@ -438,8 +498,6 @@ def _evaluate_change(arguments: argparse.Namespace, diff_text: str) -> ChangeDec
                 diff_text=diff_text,
                 repository_root=root,
                 base_revisions=base_revisions,
-                tests_passed=True if arguments.tests_complete else None,
-                test_evidence=evidence,
                 change_context_id=arguments.change_context_id,
             )
         )

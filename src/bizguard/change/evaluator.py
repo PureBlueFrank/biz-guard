@@ -17,6 +17,7 @@ from bizguard.impact.service import ImpactService
 from bizguard.observability import AuditTrail
 from bizguard.policy.registry import PolicyDefinition, load_registry
 from bizguard.policy.validators import validate_artifact
+from bizguard.production import GovernancePaths
 from bizguard.rag.injector import load_contract_registry
 from bizguard.semantic.models import CatalogRequiredTest, SemanticCatalog, load_catalog
 from bizguard.workflow.approval import ApprovalRequest
@@ -57,12 +58,13 @@ class ChangeEvaluator:
         approval_store: ApprovalStore | None = None,
         audit: AuditTrail | None = None,
         metric_records: list[dict[str, object]] | None = None,
+        governance: GovernancePaths | None = None,
     ) -> None:
         self._root = repository_root
-        project_root = Path(__file__).parents[3]
-        self._catalog = catalog or load_catalog(Path(__file__).parents[1] / "semantic" / "catalog.yaml")
-        self._registry = registry or load_registry(project_root / "policy" / "phase5-registry.yaml")
-        self._contracts = load_contract_registry(project_root / "registry" / "contracts.yaml")
+        self._governance = governance or GovernancePaths.from_env()
+        self._catalog = catalog or load_catalog(self._governance.catalog)
+        self._registry = registry or load_registry(self._governance.policy_registry)
+        self._contracts = load_contract_registry(self._governance.contract_registry)
         self._approval_store = approval_store
         self.audit = audit or AuditTrail()
         self.metric_records = metric_records if metric_records is not None else []
@@ -225,6 +227,10 @@ class ChangeEvaluator:
             return "fingerprint_mismatch", False
         if not set(required_approvers).issubset(approval.approvers):
             return "approver_mismatch", False
+        if approval.state is ApprovalState.APPROVED and not set(required_approvers).issubset(
+            approval.approvals
+        ):
+            return "approver_mismatch", False
         if approval.waiver is not None:
             if approval.waiver.active():
                 return "waived", True
@@ -257,7 +263,12 @@ class ChangeEvaluator:
 
     def _python_findings(self, parsed_diff: ParsedDiff) -> list[FindingV2]:
         """Map the Python invariant pipeline's findings onto the shared finding model."""
-        card = evaluate_parsed(parsed_diff)
+        card = evaluate_parsed(
+            parsed_diff,
+            contract_registry_path=self._governance.contract_registry,
+            invariants_path=self._governance.invariants,
+            knowledge_root=self._governance.invariant_knowledge,
+        )
         findings: list[FindingV2] = []
         for item in card.findings:
             if item.status is FindingStatus.VIOLATED:
@@ -327,12 +338,23 @@ class ChangeEvaluator:
             changed_symbol = changed_id_from_diff_text(snapshot, request.diff_text, "change")
         except ValueError:
             return None, [], []
-        report = ImpactService(request.repository_root).analyze(
-            changed_symbol,
-            revision,
-            capability=None,
-            diff_text=request.diff_text,
-        )
+        try:
+            report = ImpactService(request.repository_root, self._catalog).analyze(
+                changed_symbol,
+                revision,
+                capability=None,
+                diff_text=request.diff_text,
+            )
+        except ValueError as exc:
+            finding = FindingV2(
+                id=f"impact:CAPABILITY_UNRESOLVED:{changed_symbol}",
+                severity="high",
+                effect=str(exc),
+                remediation="register an unambiguous capability and required-test mapping",
+                confidence=1.0,
+                critical_unknown=True,
+            )
+            return finding, [], []
         tests = [CatalogRequiredTest.model_validate(item) for item in report.required_tests]
         if not report.unknown_boundary:
             return None, tests, []

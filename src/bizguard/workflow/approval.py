@@ -3,12 +3,32 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from functools import wraps
+from threading import RLock
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
 from bizguard.observability import AuditTrail
 from .state_machine import ApprovalState, transition
 from .store import ApprovalStore
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+_WORKFLOW_LOCK = RLock()
+
+
+def _synchronized(method: Callable[P, R]) -> Callable[P, R]:
+    """Serialize approval read-modify-write operations inside one service process."""
+
+    @wraps(method)
+    def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
+        with _WORKFLOW_LOCK:
+            return method(*args, **kwargs)
+
+    return wrapped
 
 
 class Waiver(BaseModel):
@@ -68,6 +88,7 @@ class ApprovalService:
         self._cache: dict[tuple[str, str, str, tuple[str, ...]], ApprovalRequest] = {}
         self.audit = AuditTrail()
 
+    @_synchronized
     def create(self, request: ApprovalRequest) -> ApprovalRequest:
         if not self.available:
             self.audit.add("approval_unavailable", request.change_context_id)
@@ -97,6 +118,7 @@ class ApprovalService:
         )
         return request
 
+    @_synchronized
     def delegate(self, request: ApprovalRequest, approver: str, delegate: str) -> None:
         if approver not in request.approvers:
             raise ValueError("only configured approvers may delegate")
@@ -104,17 +126,20 @@ class ApprovalService:
         self._record("approval_delegated", request, approver=approver, delegate=delegate)
         self._persist(request)
 
+    @_synchronized
     def add_evidence(self, request: ApprovalRequest, evidence: str) -> None:
         request.state = transition(request.state, ApprovalState.PENDING)
         request.evidence_refs.append(evidence)
         self._record("evidence_added", request, evidence=evidence)
         self._persist(request)
 
+    @_synchronized
     def request_evidence(self, request: ApprovalRequest, reason: str) -> None:
         request.state = transition(request.state, ApprovalState.EVIDENCE_REQUESTED)
         self._record("evidence_requested", request, reason=reason)
         self._persist(request)
 
+    @_synchronized
     def approve(self, request: ApprovalRequest, actor: str) -> None:
         eligible = set(request.approvers) | set(request.delegates.values())
         if actor not in eligible:
@@ -130,6 +155,7 @@ class ApprovalService:
             self._record("approval_granted", request)
         self._persist(request)
 
+    @_synchronized
     def reject(self, request: ApprovalRequest, actor: str, reason: str) -> None:
         if actor not in set(request.approvers) | set(request.delegates.values()):
             raise ValueError("actor is not an approver or delegate")
@@ -137,6 +163,7 @@ class ApprovalService:
         self._record("approval_rejected", request, actor=actor, reason=reason)
         self._persist(request)
 
+    @_synchronized
     def grant_waiver(self, request: ApprovalRequest, waiver: Waiver) -> None:
         if not waiver.scope or not waiver.reason or not waiver.compensating_control:
             raise ValueError("waiver requires scope, reason, and compensating control")
@@ -144,6 +171,7 @@ class ApprovalService:
         self._record("waiver_granted", request, scope=waiver.scope)
         self._persist(request)
 
+    @_synchronized
     def expire_or_escalate(self, request: ApprovalRequest, deadline: datetime, now: datetime | None = None) -> None:
         if (now or datetime.now(timezone.utc)) >= deadline and request.state in {ApprovalState.PENDING, ApprovalState.EVIDENCE_REQUESTED}:
             request.state = transition(request.state, ApprovalState.ESCALATED)

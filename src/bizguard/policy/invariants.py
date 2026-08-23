@@ -53,7 +53,11 @@ class Invariant(BaseModel):
     evidence_refs: list[str]
 
 
-def load_invariants(path: Path) -> list[Invariant]:
+def load_invariants(
+    path: Path,
+    contract_registry_path: Path | None = None,
+    knowledge_root: Path | None = None,
+) -> list[Invariant]:
     """Load a version-one invariant file and reject malformed policy documents."""
     try:
         loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -75,15 +79,23 @@ def load_invariants(path: Path) -> list[Invariant]:
             raise PolicyLoadError(
                 f"invariant {invariant.id} contains an invalid evidence reference"
             )
-    _validate_cross_file_references(path, invariants)
+    project_root = path.parent.parent
+    _validate_cross_file_references(
+        contract_registry_path or project_root / "registry" / "contracts.yaml",
+        knowledge_root or project_root / "knowledge",
+        invariants,
+    )
     return invariants
 
 
-def _validate_cross_file_references(path: Path, invariants: list[Invariant]) -> None:
-    project_root = path.parent.parent
+def _validate_cross_file_references(
+    contract_registry_path: Path,
+    knowledge_root: Path,
+    invariants: list[Invariant],
+) -> None:
     try:
         registry = yaml.safe_load(
-            (project_root / "registry" / "contracts.yaml").read_text(encoding="utf-8")
+            contract_registry_path.read_text(encoding="utf-8")
         )
         if not isinstance(registry, dict) or not isinstance(registry.get("contracts"), list):
             raise PolicyLoadError("contract registry has no contracts list")
@@ -99,7 +111,7 @@ def _validate_cross_file_references(path: Path, invariants: list[Invariant]) -> 
             for policy_id in item["policy_ids"]
             if isinstance(policy_id, str)
         }
-        knowledge_ids, knowledge_policy_ids = _knowledge_references(project_root / "knowledge")
+        knowledge_ids, knowledge_policy_ids = _knowledge_references(knowledge_root)
     except (OSError, yaml.YAMLError, PolicyLoadError) as exc:
         raise PolicyLoadError(f"unable to validate cross-file Policy references: {exc}") from exc
     invariant_ids = {invariant.id for invariant in invariants}

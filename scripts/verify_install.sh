@@ -122,10 +122,11 @@ print(json.dumps(asyncio.run(verify()), sort_keys=True))
 PY
 
 set +e
-ci_output=$("$PYTHON_BIN" -m bizguard.ci.check \
+ci_output=$("$PYTHON_BIN" -m bizguard.ci.runner \
   --diff "$fixture" \
   --base-revisions "$PROJECT_ROOT/bench/fixtures/phase3-revisions.yaml" \
-  --tests-complete \
+  --repository-root "$PROJECT_ROOT/fixtures/java-microservices" \
+  --test-root "$PROJECT_ROOT/fixtures/java-microservices" \
   --json)
 ci_code=$?
 set -e

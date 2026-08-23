@@ -28,6 +28,9 @@ dev = [
 [project.scripts]
 bizguard = "bizguard.cli:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/bizguard", "agents_mcp"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

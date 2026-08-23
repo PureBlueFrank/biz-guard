@@ -227,18 +227,19 @@ class ContextCompiler:
         return selected.id, capability.id
 
     def _search(self, task: str, principal: str, capability: str) -> SearchResult:
+        caller_roles = [role.strip() for role in principal.split(",") if role.strip()]
         if self._reuse_index:
             if self._knowledge_repository is None:
                 self._knowledge_repository = KnowledgeRepository.memory()
                 ingest_directory(self._knowledge_root, self._knowledge_repository)
             return HybridSearch(self._knowledge_repository, LocalVectorAdapter(), self._catalog).search(
-                SearchRequest(query=task, caller_roles=[principal], scope=capability, revision=self._catalog.revision)
+                SearchRequest(query=task, caller_roles=caller_roles, scope=capability, revision=self._catalog.revision)
             )
         repository = KnowledgeRepository.memory()
         try:
             ingest_directory(self._knowledge_root, repository)
             return HybridSearch(repository, LocalVectorAdapter(), self._catalog).search(
-                SearchRequest(query=task, caller_roles=[principal], scope=capability, revision=self._catalog.revision)
+                SearchRequest(query=task, caller_roles=caller_roles, scope=capability, revision=self._catalog.revision)
             )
         finally:
             repository.close()

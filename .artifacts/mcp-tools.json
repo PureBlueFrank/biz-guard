@@ -35,11 +35,6 @@
             "default": null,
             "title": "Diff Text"
           },
-          "principal": {
-            "default": "engineering",
-            "title": "Principal",
-            "type": "string"
-          },
           "repos": {
             "anyOf": [
               {
@@ -92,13 +87,6 @@
       "icons": null,
       "inputSchema": {
         "properties": {
-          "caller_roles": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Caller Roles",
-            "type": "array"
-          },
           "limit": {
             "default": 5,
             "title": "Limit",
@@ -120,8 +108,7 @@
         "required": [
           "query",
           "scope",
-          "revision",
-          "caller_roles"
+          "revision"
         ],
         "title": "search_team_knowledgeArguments",
         "type": "object"
