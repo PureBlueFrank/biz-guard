@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+from typing import cast
 
 import pytest
 import yaml  # type: ignore[import-untyped]
@@ -168,3 +170,57 @@ def test_runner_uses_deployment_catalog(
     assert result["decision"] == "ALLOW_WITH_TESTS"
     assert len(evidence) == 1
     assert evidence[0].passed is False
+
+
+def test_runner_binds_test_evidence_to_explicit_index_revision() -> None:
+    revisions: dict[str, object] = {
+        "coupon-core": "coupon-base",
+        "__index__": "custom-index-revision",
+    }
+    result, evidence = run_gate(
+        (ROOT / "bench/fixtures/phase3/dto-status.diff").read_text(encoding="utf-8"),
+        revisions,
+        ROOT / "fixtures/java-microservices",
+        ROOT / "fixtures/java-microservices",
+    )
+
+    assert evidence and {item.revision for item in evidence} == {"custom-index-revision"}
+    assert result["decision"] == "ALLOW"
+
+
+def test_runner_uses_base_snapshot_for_validation_and_head_for_tests(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path / "base"
+    head = tmp_path / "head"
+    shutil.copytree(ROOT / "fixtures/java-microservices", base)
+    shutil.copytree(ROOT / "fixtures/java-microservices", head)
+    proto = head / "coupon-contract/src/main/resources/coupon.proto"
+    proto.write_text(
+        proto.read_text(encoding="utf-8").replace(" string idempotency_key = 2;", ""),
+        encoding="utf-8",
+    )
+    diff = """\
+diff --git a/coupon-contract/src/main/resources/coupon.proto b/coupon-contract/src/main/resources/coupon.proto
+--- a/coupon-contract/src/main/resources/coupon.proto
++++ b/coupon-contract/src/main/resources/coupon.proto
+@@ -4,1 +4,1 @@
+-message RedeemRequest { string coupon_code = 1; string idempotency_key = 2; }
++message RedeemRequest { string coupon_code = 1; }
+"""
+
+    result, _ = run_gate(
+        diff,
+        {"coupon-contract": "base", "__index__": "base"},
+        base,
+        head,
+    )
+
+    findings = cast(list[dict[str, object]], result["findings"])
+    assert result["decision"] == "REQUIRE_APPROVAL"
+    assert not any("RECONSTRUCTION_INCOMPLETE" in str(item["id"]) for item in findings)
+
+
+def test_github_gate_points_validation_at_trusted_base_snapshot() -> None:
+    workflow = (ROOT / ".github/workflows/bizguard.yml").read_text(encoding="utf-8")
+    assert '--repository-root "$RUNNER_TEMP/bizguard-trusted"' in workflow

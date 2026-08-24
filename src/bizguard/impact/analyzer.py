@@ -15,7 +15,7 @@ _LAYER_KINDS = {
     "L2": {EdgeKind.EXPOSES, EdgeKind.SERIALIZES_TO, EdgeKind.MAPS_TO},
     "L3": {EdgeKind.CONSUMES, EdgeKind.CALLS, EdgeKind.PUBLISHES, EdgeKind.OBSERVED_CALL},
     "L4": {EdgeKind.DEPLOYED_WITH},
-    "L5": {EdgeKind.BELONGS_TO_CAPABILITY, EdgeKind.OWNED_BY},
+    "L5": {EdgeKind.BELONGS_TO_CAPABILITY, EdgeKind.PROTECTED_BY, EdgeKind.OWNED_BY},
 }
 _TRAVERSABLE = set().union(*_LAYER_KINDS.values())
 _SEMANTIC_CONTINUATIONS = _LAYER_KINDS["L2"] | _LAYER_KINDS["L3"]
@@ -27,6 +27,7 @@ class ImpactResult:
 
     layers: dict[str, list[str]]
     path: list[str]
+    paths: list[list[str]]
     evidence: list[Evidence]
     unknown_boundary: bool = False
     unknown_reason: str | None = None
@@ -37,19 +38,25 @@ def analyze(snapshot: GraphSnapshot, changed_id: str, revision: str) -> ImpactRe
     if snapshot.revision != revision or changed_id not in {node.id for node in snapshot.nodes}:
         return _unknown_result(snapshot, changed_id, "NO_INDEXED_ROUTE")
 
-    path_edges = _shortest_terminal_path(snapshot, changed_id)
-    if path_edges:
-        path = [changed_id]
-        for edge in path_edges:
-            path.append(_other_end(edge, path[-1]))
-        return ImpactResult(_layers(path, path_edges), path, _evidence(path_edges))
+    terminal_routes = _shortest_terminal_paths(snapshot, changed_id)
+    if terminal_routes:
+        paths = [_path(changed_id, edges) for edges in terminal_routes]
+        primary_edges = terminal_routes[0]
+        primary_path = paths[0]
+        evidence = _evidence(
+            [edge for route in terminal_routes for edge in route]
+        )
+        return ImpactResult(
+            _layers(primary_path, primary_edges), primary_path, paths, _deduplicate(evidence)
+        )
 
     node = next(item for item in snapshot.nodes if item.id == changed_id)
     reason = "DYNAMIC_BOUNDARY" if node.properties.get("dynamic") == "true" else "NO_INDEXED_ROUTE"
     return _unknown_result(snapshot, changed_id, reason, node.properties.get("boundary_evidence_uri"))
 
 
-def _shortest_terminal_path(snapshot: GraphSnapshot, start: str) -> list[GraphEdge]:
+def _shortest_terminal_paths(snapshot: GraphSnapshot, start: str) -> list[list[GraphEdge]]:
+    """Return one deterministic shortest path for every reachable business terminal."""
     adjacency: dict[str, list[GraphEdge]] = {}
     for edge in snapshot.edges:
         if edge.kind in _TRAVERSABLE:
@@ -57,12 +64,19 @@ def _shortest_terminal_path(snapshot: GraphSnapshot, start: str) -> list[GraphEd
             adjacency.setdefault(edge.target_id, []).append(edge)
     queue: deque[tuple[str, list[GraphEdge], bool]] = deque([(start, [], False)])
     seen = {(start, False)}
+    routes: dict[str, list[GraphEdge]] = {}
     while queue:
         node, route, crossed_boundary = queue.popleft()
         if crossed_boundary and node != start and node.startswith(_TERMINAL_PREFIXES):
-            return route
+            routes.setdefault(node, route)
         for edge in sorted(adjacency.get(node, []), key=lambda item: item.id):
-            if edge.kind in {EdgeKind.DECLARES, EdgeKind.DEPLOYED_WITH, EdgeKind.BELONGS_TO_CAPABILITY, EdgeKind.OWNED_BY} and not crossed_boundary:
+            if edge.kind in {
+                EdgeKind.DECLARES,
+                EdgeKind.DEPLOYED_WITH,
+                EdgeKind.BELONGS_TO_CAPABILITY,
+                EdgeKind.PROTECTED_BY,
+                EdgeKind.OWNED_BY,
+            } and not crossed_boundary:
                 continue
             nxt = _other_end(edge, node)
             if nxt == start:
@@ -72,7 +86,14 @@ def _shortest_terminal_path(snapshot: GraphSnapshot, start: str) -> list[GraphEd
             if state not in seen:
                 seen.add(state)
                 queue.append((nxt, [*route, edge], next_crossed_boundary))
-    return []
+    return [routes[key] for key in sorted(routes)]
+
+
+def _path(start: str, edges: list[GraphEdge]) -> list[str]:
+    result = [start]
+    for edge in edges:
+        result.append(_other_end(edge, result[-1]))
+    return result
 
 
 def _other_end(edge: GraphEdge, node: str) -> str:
@@ -91,7 +112,12 @@ def _unknown_result(
         )
     ]
     return ImpactResult(
-        _empty_layers(changed_id), [changed_id, "UNKNOWN_BOUNDARY"], evidence, True, reason
+        _empty_layers(changed_id),
+        [changed_id, "UNKNOWN_BOUNDARY"],
+        [[changed_id, "UNKNOWN_BOUNDARY"]],
+        evidence,
+        True,
+        reason,
     )
 
 
@@ -117,3 +143,7 @@ def _evidence(edges: list[GraphEdge]) -> list[Evidence]:
         )
         for edge in edges
     ]
+
+
+def _deduplicate(items: list[Evidence]) -> list[Evidence]:
+    return list({item.id: item for item in items}.values())

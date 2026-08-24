@@ -1,9 +1,11 @@
 from pathlib import Path
+import shutil
 
 from bizguard.eval.impact import _independent_shortest_path
 from bizguard.graph.indexer import index
 from bizguard.graph.models import EdgeKind, GraphEdge, GraphNode, GraphSnapshot, NodeKind
 from bizguard.impact.analyzer import analyze
+from bizguard.impact.service import ImpactService
 
 
 ROOT = Path("fixtures/java-microservices")
@@ -75,3 +77,71 @@ def test_dynamic_dead_end_has_the_same_unknown_fallback_in_evaluator() -> None:
         [GraphEdge(dynamic, dead_end, EdgeKind.MAPS_TO, "AST", 0.9, "r", "repo://test#L1")],
     )
     assert analyze(snapshot, dynamic, "r").path == _independent_shortest_path(snapshot, dynamic)
+
+
+def test_analysis_returns_a_shortest_path_for_every_reachable_terminal() -> None:
+    start = "repo://coupon-core/Example.java#Example.status"
+    boundary = "api://coupon-core/GET/status"
+    capability = "capability://coupon-redemption"
+    invariant = "invariant://status-compatible"
+    snapshot = GraphSnapshot(
+        "r",
+        {},
+        "",
+        [
+            GraphNode(start, NodeKind.CODE, "status", "r"),
+            GraphNode(boundary, NodeKind.INTERFACE, "status", "r"),
+            GraphNode(capability, NodeKind.BUSINESS, "redemption", "r"),
+            GraphNode(invariant, NodeKind.BUSINESS, "compatible", "r"),
+        ],
+        [
+            GraphEdge(start, boundary, EdgeKind.MAPS_TO, "AST", 0.9, "r", "repo://edge/1"),
+            GraphEdge(boundary, capability, EdgeKind.BELONGS_TO_CAPABILITY, "catalog", 1.0, "r", "catalog://capability"),
+            GraphEdge(boundary, invariant, EdgeKind.BELONGS_TO_CAPABILITY, "catalog", 1.0, "r", "catalog://invariant"),
+        ],
+    )
+    result = analyze(snapshot, start, "r")
+    assert {path[-1] for path in result.paths} == {capability, invariant}
+
+
+def test_analysis_continues_from_capability_to_reachable_owner() -> None:
+    start = "repo://coupon-core/Example.java#Example.status"
+    capability = "capability://coupon-redemption"
+    owner = "owner://coupon-platform"
+    snapshot = GraphSnapshot(
+        "r",
+        {},
+        "",
+        [
+            GraphNode(start, NodeKind.CODE, "status", "r"),
+            GraphNode(capability, NodeKind.BUSINESS, "redemption", "r"),
+            GraphNode(owner, NodeKind.ORGANIZATION, "coupon platform", "r"),
+        ],
+        [
+            GraphEdge(start, capability, EdgeKind.MAPS_TO, "AST", 0.9, "r", "repo://edge/1"),
+            GraphEdge(capability, owner, EdgeKind.OWNED_BY, "catalog", 1.0, "r", "catalog://owner"),
+        ],
+    )
+
+    result = analyze(snapshot, start, "r")
+    assert {path[-1] for path in result.paths} == {capability, owner}
+
+
+def test_impact_service_invalidates_same_revision_snapshot_when_sources_change(
+    tmp_path: Path,
+) -> None:
+    fixtures = tmp_path / "fixtures"
+    shutil.copytree(ROOT, fixtures)
+    service = ImpactService(fixtures)
+    symbol = (
+        "repo://coupon-core/src/main/java/com/bizguard/coupon/api/"
+        "CouponResponse.java#CouponResponse.status"
+    )
+    service.analyze(symbol, "same-revision")
+    before = service._snapshots["same-revision"].content_digest
+    source = fixtures / "coupon-core/src/main/java/com/bizguard/coupon/api/CouponResponse.java"
+    source.write_text(source.read_text(encoding="utf-8") + "\n// indexed change\n", encoding="utf-8")
+    service.analyze(symbol, "same-revision")
+    after = service._snapshots["same-revision"].content_digest
+
+    assert before != after

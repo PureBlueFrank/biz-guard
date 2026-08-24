@@ -1,4 +1,4 @@
 policies:
-  - {id: redeem-ledger-consistency, validator: ast, scope: coupon_redemption, severity: critical, owner: coupon_platform, remediation: restore ledger write semantics, required_tests: [coupon-ledger-audit-test], mode: shadow}
-  - {id: published-dto-backward-compatible, validator: proto_openapi, scope: public_contract, severity: high, owner: coupon_platform, remediation: restore field or version the contract, required_tests: [coupon-dto-contract-test], mode: warning}
-  - {id: coupon-write-consumes-idempotency-key, validator: ast, scope: coupon_redemption, severity: critical, owner: coupon_platform, remediation: consume idempotency key before write, required_tests: [coupon-idempotency-test], mode: shadow}
+  - {id: redeem-ledger-consistency, validator: sql_transaction, scope: coupon_redemption, severity: critical, owner: coupon_platform, remediation: restore ledger write semantics, required_tests: [coupon-ledger-audit-test], mode: shadow, precision: medium}
+  - {id: published-dto-backward-compatible, validator: proto_openapi, scope: public_contract, severity: high, owner: coupon_platform, remediation: restore field or version the contract, required_tests: [coupon-dto-contract-test], mode: warning, precision: medium}
+  - {id: coupon-write-consumes-idempotency-key, validator: schema_version, scope: coupon_redemption, severity: critical, owner: coupon_platform, remediation: consume idempotency key before write, required_tests: [coupon-idempotency-test], mode: shadow, precision: medium}

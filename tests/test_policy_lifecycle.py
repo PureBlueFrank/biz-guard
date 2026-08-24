@@ -54,3 +54,103 @@ components:
 """
 
     assert validate_artifact("published-dto-backward-compatible", full_content, "openapi.yaml")["violated"] is True
+
+
+def test_proto_baseline_detects_removed_field_and_changed_number() -> None:
+    before = "message Coupon { string id = 1; string status = 2; }"
+    removed = "message Coupon { string id = 1; }"
+    renumbered = "message Coupon { string id = 1; string status = 3; }"
+    assert validate_artifact(
+        "published-dto-backward-compatible",
+        removed,
+        "coupon.proto",
+        baseline_source=before,
+    )["violated"] is True
+    assert validate_artifact(
+        "published-dto-backward-compatible",
+        renumbered,
+        "coupon.proto",
+        baseline_source=before,
+    )["violated"] is True
+
+
+def test_proto_baseline_detects_outer_field_after_nested_message() -> None:
+    before = "message Outer { message Inner { string status = 1; } string id = 1; }"
+    after = "message Outer { message Inner { string status = 1; } }"
+
+    assert validate_artifact(
+        "published-dto-backward-compatible",
+        after,
+        "coupon.proto",
+        baseline_source=before,
+    )["violated"] is True
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        (
+            "components:\n  schemas:\n    Coupon:\n      allOf:\n"
+            "        - properties:\n            status: {type: string}\n",
+            "components:\n  schemas:\n    Coupon:\n      allOf:\n"
+            "        - properties: {}\n",
+        ),
+        (
+            "swagger: '2.0'\ndefinitions:\n  Coupon:\n    properties:\n"
+            "      status: {type: string}\n",
+            "swagger: '2.0'\ndefinitions:\n  Coupon:\n    properties: {}\n",
+        ),
+        (
+            "openapi: 3.0.0\ncomponents:\n  schemas:\n    CouponList:\n"
+            "      type: array\n      items:\n        properties:\n"
+            "          status: {type: string}\n",
+            "openapi: 3.0.0\ncomponents:\n  schemas:\n    CouponList:\n"
+            "      type: array\n      items:\n        properties: {}\n",
+        ),
+        (
+            "openapi: 3.0.0\npaths:\n  /coupon:\n    get:\n      responses:\n"
+            "        '200':\n          content:\n            application/json:\n"
+            "              schema:\n                oneOf:\n                  - properties:\n"
+            "                      status: {type: string}\n",
+            "openapi: 3.0.0\npaths:\n  /coupon:\n    get:\n      responses:\n"
+            "        '200':\n          content:\n            application/json:\n"
+            "              schema:\n                oneOf:\n                  - properties: {}\n",
+        ),
+    ],
+)
+def test_openapi_composed_and_inline_schema_field_removal_is_detected(
+    before: str, after: str
+) -> None:
+    assert validate_artifact(
+        "published-dto-backward-compatible",
+        after,
+        "openapi.yaml",
+        baseline_source=before,
+    )["violated"] is True
+
+
+def test_sql_start_transaction_is_accepted() -> None:
+    result = validate_artifact(
+        "redeem-ledger-consistency",
+        "START TRANSACTION; UPDATE ledger SET status='SUCCESS'; COMMIT;",
+        "migration.sql",
+    )
+    assert result["violated"] is False
+
+
+def test_sql_write_after_cte_still_requires_a_transaction() -> None:
+    result = validate_artifact(
+        "redeem-ledger-consistency",
+        "WITH rows AS (SELECT 1) UPDATE ledger SET status='SUCCESS';",
+        "migration.sql",
+    )
+    assert result["violated"] is True
+
+
+def test_sql_keywords_inside_strings_and_comments_are_ignored() -> None:
+    result = validate_artifact(
+        "redeem-ledger-consistency",
+        "SELECT 'UPDATE ledger'; -- DELETE FROM ledger\nSELECT 1;",
+        "migration.sql",
+    )
+    assert result["violated"] is False

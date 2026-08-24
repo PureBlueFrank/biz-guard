@@ -95,8 +95,14 @@ async def verify() -> dict[str, object]:
         raise RuntimeError("prepare_change did not compile the requested task")
 
     diff_text = Path(sys.argv[1]).read_text(encoding="utf-8")
-    fast = structured(await mcp.call_tool("validate_patch", {"diff_text": diff_text}))
-    aggregate = structured(await mcp.call_tool("get_change_decision", {"diff_text": diff_text}))
+    validation_fixture = Path("sample/diffs/diff_violation_1.diff").read_text(encoding="utf-8")
+    fast = structured(await mcp.call_tool("validate_patch", {"diff_text": validation_fixture}))
+    aggregate = structured(
+        await mcp.call_tool(
+            "get_change_decision",
+            {"diff_text": diff_text, "change_context_id": prepared["change_context_id"]},
+        )
+    )
     impact = structured(
         await mcp.call_tool(
             "analyze_impact",
@@ -105,6 +111,8 @@ async def verify() -> dict[str, object]:
     )
     if aggregate.get("decision") != "REQUIRE_APPROVAL":
         raise RuntimeError(f"FastMCP aggregate decision mismatch: {aggregate.get('decision')}")
+    if fast.get("decision") != "BLOCK":
+        raise RuntimeError(f"FastMCP validation decision mismatch: {fast.get('decision')}")
     if impact.get("unknown_reason") != "DYNAMIC_BOUNDARY":
         raise RuntimeError(f"FastMCP impact reason mismatch: {impact.get('unknown_reason')}")
     if impact.get("required_approvers") != ["coupon_platform"]:

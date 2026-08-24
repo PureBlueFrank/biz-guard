@@ -8,15 +8,16 @@ import json
 import math
 from pathlib import Path
 import re
+from threading import RLock
 
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
 from bizguard.change.store import ChangeContextStore
 from bizguard.impact.service import ImpactReport, ImpactService
-from bizguard.graph.indexer import index
+from bizguard.graph.indexer import content_digest, index
 from bizguard.graph.models import GraphSnapshot
-from bizguard.knowledge.ingest import ingest_directory
+from bizguard.knowledge.ingest import ingest_directory, knowledge_content_digest
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.models import SearchResult
 from bizguard.knowledge.repository import KnowledgeRepository
@@ -45,6 +46,7 @@ class ContextPack(BaseModel):
     base_revisions: dict[str, str]
     index_revision: str
     graph_content_digest: str
+    knowledge_content_digest: str
     index_version: str
     principal: str
     token_budget: int
@@ -56,6 +58,7 @@ class ContextPack(BaseModel):
     rationale: ContextLayer
     expandable: ContextLayer
     candidates: list[str]
+    candidate_confidence: float
     impact: ImpactReport
     required_tests: list[dict[str, object]]
     required_approvers: list[str]
@@ -73,8 +76,8 @@ def _tokens(value: object) -> int:
     )
 
 
-def _id(task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str, digest: str) -> str:
-    payload = {"task": task, "repos": sorted(repos), "revisions": revisions, "principal": principal, "index": index_version, "graph_content_digest": digest}
+def _id(task: str, repos: list[str], revisions: dict[str, str], principal: str, index_version: str, graph_digest: str, knowledge_digest: str, hint_symbols: list[str]) -> str:
+    payload = {"task": task, "repos": sorted(repos), "revisions": revisions, "principal": principal, "index": index_version, "graph_content_digest": graph_digest, "knowledge_content_digest": knowledge_digest, "hint_symbols": sorted(hint_symbols)}
     return "ctx-" + sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:20]
 
 
@@ -97,8 +100,10 @@ class ContextCompiler:
         self._catalog = load_catalog(catalog_path or root / "src/bizguard/semantic/catalog.yaml")
         self._cache, self._store, self._now = cache or ContextCache(now=now), store, now
         self._reuse_index = reuse_index
+        self._reuse_lock = RLock()
         self._graphs: dict[str, GraphSnapshot] = {}
         self._knowledge_repository: KnowledgeRepository | None = None
+        self._knowledge_signature: tuple[tuple[str, str], ...] | None = None
 
     def compile(
         self,
@@ -108,22 +113,34 @@ class ContextCompiler:
         principal: str = "engineering",
         token_budget: int = 2000,
         index_version: str = "graph-index-v1",
+        hint_symbols: list[str] | None = None,
     ) -> ContextPack:
-        if token_budget not in {800, 1200, 2000, 4000}:
-            raise ValueError("token_budget must be one of 800, 1200, 2000, 4000")
+        if token_budget < 100:
+            raise ValueError("token_budget must be at least 100")
         if not task.strip() or not repos:
             raise ValueError("task and repos are required")
+        hints = sorted(set(hint_symbols or []))
         revisions = self._revisions(base_revisions, repos)
         revision = self._index_revision(revisions)
         graph = self._graph(revision)
-        cache_revisions = revisions | {"__graph_content_digest__": graph.content_digest}
-        key = CacheKey.create(task, repos, cache_revisions, principal, index_version, token_budget)
+        knowledge_signature = self._knowledge_digest()
+        knowledge_digest = knowledge_content_digest(self._knowledge_root)
+        cache_revisions = revisions | {
+            "__graph_content_digest__": graph.content_digest,
+            "__knowledge_content_digest__": knowledge_digest,
+        }
+        cache_task = task + "\n" + json.dumps(hints, ensure_ascii=False)
+        key = CacheKey.create(cache_task, repos, cache_revisions, principal, index_version, token_budget)
         cached = self._cache.get(key, cache_revisions)
         if cached is not None:
             return cached
-        symbol, capability = self._candidate(task, repos, graph)
-        impact = ImpactService(self._repositories_root, self._catalog).analyze(symbol, revision, capability)
-        search = self._search(task, principal, capability)
+        symbol, capability, candidates, candidate_confidence = self._candidate(
+            task, repos, graph, hints
+        )
+        impact = ImpactService(self._repositories_root, self._catalog).analyze(
+            symbol, revision, capability, snapshot=graph
+        )
+        search = self._search(task, principal, capability, knowledge_signature)
         policies = [item for item in self._catalog.policies if item.capability == capability]
         mandatory_items: list[dict[str, object]] = [
             {"policy_id": item.id, "severity": item.severity, "invariant": item.invariant,
@@ -147,7 +164,16 @@ class ContextCompiler:
         expandable_items.append({"semantic_channel": search.semantic_channel})
         expandable = ContextLayer(name="Expandable", items=expandable_items)
         self._apply_budget(token_budget, mandatory, structural, rationale, expandable, evidence)
-        context_id = _id(task, repos, revisions, principal, index_version, graph.content_digest)
+        context_id = _id(
+            task,
+            repos,
+            revisions,
+            principal,
+            index_version,
+            graph.content_digest,
+            knowledge_digest,
+            hints,
+        )
         retained_policy_ids = {str(item["policy_id"]) for item in mandatory.items}
         policy_recall = len(retained_policy_ids) / len(policies) if policies else 1.0
         requested_digest = revision.removeprefix("sha256:") if revision.startswith("sha256:") else None
@@ -155,12 +181,14 @@ class ContextCompiler:
             change_context_id=context_id, task=task, repositories=sorted(repos),
             base_revisions={key: value for key, value in revisions.items() if key != "__index__"},
             index_revision=revision, graph_content_digest=graph.content_digest,
+            knowledge_content_digest=knowledge_digest,
             index_version=index_version, principal=principal, token_budget=token_budget,
             token_count=_tokens({"mandatory": mandatory.model_dump(), "structural": structural.model_dump(), "rationale": rationale.model_dump(), "expandable": expandable.model_dump(), "evidence": evidence}),
             mandatory_policy_recall=policy_recall,
             stale=requested_digest is not None and requested_digest != graph.content_digest,
             mandatory=mandatory, structural=structural, rationale=rationale,
-            expandable=expandable, candidates=[symbol], impact=impact, required_tests=impact.required_tests,
+            expandable=expandable, candidates=candidates, candidate_confidence=candidate_confidence,
+            impact=impact, required_tests=impact.required_tests,
             required_approvers=impact.required_approvers,
             unknowns=( ["NO_MATCHING_SYMBOL"] if symbol.startswith("unknown://task/") else [] )
             + ([impact.unknown_reason] if impact.unknown_reason else []), evidence=evidence,
@@ -191,18 +219,26 @@ class ContextCompiler:
     def _index_revision(revisions: dict[str, str]) -> str:
         return revisions.get("__index__") or sha256(json.dumps(revisions, sort_keys=True).encode()).hexdigest()[:16]
 
-    def _candidate(self, task: str, repos: list[str], graph: GraphSnapshot) -> tuple[str, str]:
-        """Select by lexical graph evidence; private-method intent is not source-visibility aware yet.
-
-        P4 has no Java visibility facts, so tasks such as ``rename private redeem helper``
-        may legitimately resolve to the highest lexical graph node rather than a private
-        method.  P5 must add visibility facts before this can be made semantic.
-        """
+    def _candidate(
+        self,
+        task: str,
+        repos: list[str],
+        graph: GraphSnapshot,
+        hint_symbols: list[str],
+    ) -> tuple[str, str, list[str], float]:
+        """Fuse explicit symbol hints, lexical terms, and local vector similarity."""
         terms = set(re.findall(r"[\w-]+", task.lower()))
         candidates = [node for node in graph.nodes if any(repo in node.id for repo in repos)]
         if not candidates:
             raise ValueError("no indexed symbols in requested repositories")
-        def score(node: object) -> tuple[int, int, str]:
+        by_id = {node.id: node for node in candidates}
+        matched_hints = [hint for hint in hint_symbols if hint in by_id]
+        if hint_symbols and not matched_hints:
+            raise ValueError("hint_symbols contain no indexed symbol in the requested repositories")
+
+        vector = LocalVectorAdapter()
+
+        def score(node: object) -> tuple[float, int, str]:
             text = f"{getattr(node, 'id')} {getattr(node, 'label')}".lower()
             identifier = str(getattr(node, "id"))
             quality = 0
@@ -212,8 +248,13 @@ class ContextCompiler:
                 quality += 1
             if "." in str(getattr(node, "label")):
                 quality += 1
-            return (-sum(term in text for term in terms), -quality, identifier)
-        selected = sorted(candidates, key=score)[0]
+            lexical = sum(term in text for term in terms)
+            semantic = vector.score(task, text)
+            hinted = 100.0 if identifier in matched_hints else 0.0
+            return (-(hinted + lexical + semantic), -quality, identifier)
+
+        ranked = sorted(candidates, key=score)
+        selected = ranked[0]
         capability = max(
             self._catalog.capabilities,
             key=lambda item: (
@@ -222,19 +263,56 @@ class ContextCompiler:
                 item.id,
             ),
         )
-        if not any(term in f"{selected.id} {selected.label}".lower() for term in terms):
-            return f"unknown://task/{sha256(task.encode()).hexdigest()[:16]}", capability.id
-        return selected.id, capability.id
+        lexical_hits = sum(
+            term in f"{selected.id} {selected.label}".lower() for term in terms
+        )
+        semantic_score = vector.score(task, f"{selected.id} {selected.label}")
+        confidence = 1.0 if selected.id in matched_hints else min(
+            0.95, lexical_hits / max(1, len(terms)) + 0.35 * semantic_score
+        )
+        if confidence == 0.0:
+            unknown = f"unknown://task/{sha256(task.encode()).hexdigest()[:16]}"
+            return unknown, capability.id, [unknown], 0.0
+        candidate_ids = [selected.id]
+        if confidence < 0.35:
+            candidate_ids = [node.id for node in ranked[:3]]
+        return selected.id, capability.id, candidate_ids, confidence
 
-    def _search(self, task: str, principal: str, capability: str) -> SearchResult:
+    def _search(
+        self,
+        task: str,
+        principal: str,
+        capability: str,
+        knowledge_signature: tuple[tuple[str, str], ...],
+    ) -> SearchResult:
         caller_roles = [role.strip() for role in principal.split(",") if role.strip()]
         if self._reuse_index:
-            if self._knowledge_repository is None:
-                self._knowledge_repository = KnowledgeRepository.memory()
-                ingest_directory(self._knowledge_root, self._knowledge_repository)
-            return HybridSearch(self._knowledge_repository, LocalVectorAdapter(), self._catalog).search(
-                SearchRequest(query=task, caller_roles=caller_roles, scope=capability, revision=self._catalog.revision)
-            )
+            with self._reuse_lock:
+                if (
+                    self._knowledge_repository is None
+                    or knowledge_signature != self._knowledge_signature
+                ):
+                    replacement = KnowledgeRepository.memory()
+                    try:
+                        ingest_directory(self._knowledge_root, replacement)
+                    except Exception:
+                        replacement.close()
+                        raise
+                    previous = self._knowledge_repository
+                    self._knowledge_repository = replacement
+                    self._knowledge_signature = knowledge_signature
+                    if previous is not None:
+                        previous.close()
+                return HybridSearch(
+                    self._knowledge_repository, LocalVectorAdapter(), self._catalog
+                ).search(
+                    SearchRequest(
+                        query=task,
+                        caller_roles=caller_roles,
+                        scope=capability,
+                        revision=self._catalog.revision,
+                    )
+                )
         repository = KnowledgeRepository.memory()
         try:
             ingest_directory(self._knowledge_root, repository)
@@ -247,11 +325,20 @@ class ContextCompiler:
     def _graph(self, revision: str) -> GraphSnapshot:
         if not self._reuse_index:
             return index(self._repositories_root, revision)
-        graph = self._graphs.get(revision)
-        if graph is None:
-            graph = index(self._repositories_root, revision)
-            self._graphs[revision] = graph
-        return graph
+        digest = content_digest(self._repositories_root)
+        with self._reuse_lock:
+            graph = self._graphs.get(revision)
+            if graph is None or graph.content_digest != digest:
+                graph = index(self._repositories_root, revision)
+                self._graphs[revision] = graph
+            return graph
+
+    def _knowledge_digest(self) -> tuple[tuple[str, str], ...]:
+        """Return a content-bound signature for the governed knowledge directory."""
+        return tuple(
+            (path.name, sha256(path.read_bytes()).hexdigest())
+            for path in sorted(self._knowledge_root.glob("*.md"))
+        )
 
     @staticmethod
     def _apply_budget(

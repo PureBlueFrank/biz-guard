@@ -3,6 +3,8 @@
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from .lifecycle import PolicyMode
@@ -19,6 +21,7 @@ class PolicyDefinition(BaseModel):
     remediation: str
     required_tests: list[str] = Field(default_factory=list)
     mode: PolicyMode = PolicyMode.DRAFT
+    precision: Literal["high", "medium", "low"] = "medium"
 
 
 def load_registry(path: Path) -> list[PolicyDefinition]:

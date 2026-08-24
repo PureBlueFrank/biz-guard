@@ -43,14 +43,18 @@ cd biz-guard
 
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
+# 优先使用 tree-sitter 的预编译 wheel，避免在无 Rust 环境中误走源码构建
+pip install --prefer-binary --only-binary=tree-sitter,tree-sitter-java -e '.[dev]'
 ```
 
 离线环境需要预先准备构建依赖 `hatchling`，再执行：
 
 ```bash
-pip install --no-build-isolation -e '.[dev]'
+pip install --prefer-binary --only-binary=tree-sitter,tree-sitter-java \
+  --no-build-isolation -e '.[dev]'
 ```
+
+如果安装日志出现 `rustup-init`，说明当前平台没有匹配到 wheel；请先确认使用受支持的 Python 3.12+ 和平台，或者在明确安装 Rust 工具链后再选择源码构建。CI 也应保留 `--prefer-binary`。
 
 ### 一条命令运行完整 Demo
 
@@ -110,7 +114,7 @@ bizguard impact analyze \
   --format json
 ```
 
-该场景会返回一条可追溯路径：
+该场景会在 `paths` 中返回每个可达业务终点的最短路径，`path` 保留为向后兼容的主路径，例如：
 
 ```text
 merchant-service consumer
@@ -212,13 +216,15 @@ unified diff
 
 | 优先级 | 决策 | 触发条件 | 如何继续 |
 | --- | --- | --- | --- |
-| 1 | `BLOCK` | 存在 critical Policy 违规 | 修复违规；审批不能覆盖 critical violation |
+| 1 | `BLOCK` | 存在 `blocking` 模式的 critical Policy 违规 | 修复违规；审批不能覆盖 blocking critical violation |
 | 2 | `REQUIRE_APPROVAL` | 关键边界或版本未知 | 补充边界证据并取得匹配 Owner 的有效审批 |
 | 3 | `ALLOW_WITH_TESTS` | 已识别必测项，但缺少可信且同 revision 的通过证据 | 由可信 CI Runner 执行必测项 |
 | 4 | `REQUIRE_APPROVAL` | 公共契约/多 Owner 变更，或风险达到审批阈值 | 取得与当前 Decision Fingerprint 匹配的审批 |
 | 5 | `ALLOW` | 所有硬条件满足，测试和审批条件均已闭环 | 可以继续 |
 
 无法解析输入的旧校验入口会返回 `CHECK_INCOMPLETE`；CI 对未知决策返回退出码 2，避免“工具出错等于检查通过”。
+
+`shadow` 命中只进入 `shadow_findings` 和审计指标，不改变决策；`warning` 违规在必测证据齐备后转为审批。阻态结果同时返回 `next_actions`，Agent 可以直接得知应先重新 prepare、请求审批还是等待 CI。
 
 ### 3. 影响图谱与证据模型
 
@@ -255,6 +261,7 @@ unified diff
 # 编译 Agent 可读的 Context Pack
 bizguard prepare --task "检查优惠券状态字段变更" \
   --repos coupon-core coupon-contract \
+  --repository-root /workspace/repos \
   --base-revisions bench/fixtures/phase3-revisions.yaml \
   --json
 
@@ -267,11 +274,31 @@ bizguard knowledge search \
   --scope coupon_redemption \
   --revision semantic-seed-v1 \
   --roles engineering \
+  --repository-root /workspace/repos \
   --json
 
 # 诊断本地安装
 bizguard doctor --json
 ```
+
+所有需要读取代码仓库的 CLI 命令都支持 `--repository-root`，也可统一设置 `BIZGUARD_REPOSITORY_ROOT`。未配置时仅回退到仓库自带的 Demo fixture，不应把该回退用于生产。
+
+## 接入真实项目
+
+先运行只读检测，判断仓库中的语言、构建工具和契约类型：
+
+```bash
+bizguard onboarding --repository /workspace/my-project
+```
+
+如果适合接入，可先 dry-run 查看将生成的治理骨架，再创建缺失文件；已有文件绝不覆盖：
+
+```bash
+bizguard onboarding --repository /workspace/my-project --bootstrap --dry-run
+bizguard onboarding --repository /workspace/my-project --bootstrap
+```
+
+生成内容只是 `shadow` 模式的待审核模板。团队必须替换 capability、Owner、Policy、必测命令和证据，然后运行 `bizguard doctor --repository /workspace/my-project --json`；在真实样本完成误报校准前不得升级为 blocking。
 
 ### MCP
 
@@ -288,7 +315,7 @@ BizGuard 提供 8 个 MCP Tool：
 
 | Tool | 类型 | 用途 |
 | --- | --- | --- |
-| `prepare_change` | 只读 | 编译并持久化 Context Pack |
+| `prepare_change` | 幂等持久化写入 | 编译并持久化 Context Pack；不会修改受管代码仓库 |
 | `search_team_knowledge` | 只读 | 按服务端身份执行 ACL、scope 和 revision 过滤检索 |
 | `explain_symbol` | 只读 | 返回符号详情和图谱证据 |
 | `analyze_impact` | 只读 | 返回影响路径、未知边界、必测项和 Owner |
@@ -385,7 +412,7 @@ BizGuard 可作为带 Bearer Token 的 Streamable HTTP MCP 服务运行，当前
 - 内置 Policy 和阈值仅用于仓库验证；新组织必须先用真实样本校准，并经过 Owner 审核与回退演练。
 - SQLite 只支持单服务实例；多 Pod、多区高可用需要替换为组织级共享存储 Provider。
 - 目标 embedding 模型是智谱 `embedding-3`；离线模式降级为本地词法向量适配器，并在结果中标记 `DEGRADED`。
-- 当前候选符号选择仍包含词法匹配；没有可靠匹配时会显式返回 unknown，不应把它解释为安全。
+- 候选符号使用显式 `hint_symbols` 优先、词法与本地向量融合排序；离线向量仍是降级语义能力，低置信度时会返回多个候选或 unknown。
 - 动态调用、反射和未登记下游无法靠静态分析完全证明；这些边界会转为审批，而不是自动放行。
 
 ## 开发与贡献

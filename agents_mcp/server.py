@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+from hashlib import sha256
 from pathlib import Path
 import secrets
+from threading import RLock
 from typing import Literal
 
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -91,16 +93,37 @@ mcp = FastMCP(
 
 _READ_ONLY = ToolAnnotations(readOnlyHint=True)
 _WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+_PERSISTENT_WRITE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=True
+)
 
 _approval_store: SqliteApprovalStore | None = None
 _change_store: ChangeContextStore | None = None
+_compiler_instance: ContextCompiler | None = None
+_compiler_store: ChangeContextStore | None = None
+_knowledge_repository: KnowledgeRepository | None = None
+_knowledge_signature: tuple[tuple[str, str], ...] | None = None
+_evaluators: dict[tuple[Path, int], ChangeEvaluator] = {}
+_impact_services: dict[Path, ImpactService] = {}
+_knowledge_lock = RLock()
+
+
+def _approval_path() -> Path:
+    return Path(
+        os.environ.get("BIZGUARD_APPROVAL_DB", _ROOT / ".artifacts" / "approvals.sqlite3")
+    )
+
+
+def _context_path() -> Path:
+    return Path(
+        os.environ.get("BIZGUARD_CONTEXT_DB", _ROOT / ".artifacts" / "contexts.sqlite3")
+    )
 
 
 def _approval_service() -> ApprovalService:
     global _approval_store
     if _approval_store is None:
-        path = Path(os.environ.get("BIZGUARD_APPROVAL_DB", _ROOT / ".artifacts" / "approvals.sqlite3"))
-        _approval_store = SqliteApprovalStore(path)
+        _approval_store = SqliteApprovalStore(_approval_path())
     return ApprovalService(store=_approval_store)
 
 
@@ -128,14 +151,26 @@ def _resolve_repository_root(requested: str | None = None) -> Path:
 def _change_context_store() -> ChangeContextStore:
     global _change_store
     if _change_store is None:
-        path = Path(os.environ.get("BIZGUARD_CONTEXT_DB", _ROOT / ".artifacts" / "contexts.sqlite3"))
-        _change_store = ChangeContextStore(path)
+        _change_store = ChangeContextStore(_context_path())
     return _change_store
 
 
 def _authorized_context(change_context_id: str) -> ContextPack:
     """Load a context only when the authenticated caller satisfies its ACL roles."""
-    payload = _change_context_store().get(change_context_id)
+    temporary_store: ChangeContextStore | None = None
+    if _change_store is not None:
+        store = _change_store
+    else:
+        path = _context_path()
+        if not path.is_file():
+            raise ToolError("change context unavailable")
+        temporary_store = ChangeContextStore(path, read_only=True)
+        store = temporary_store
+    try:
+        payload = store.get(change_context_id)
+    finally:
+        if temporary_store is not None:
+            temporary_store.close()
     if payload is None:
         raise ToolError("change context unavailable")
     context = ContextPack.model_validate_json(payload)
@@ -174,21 +209,74 @@ def _caller_principal() -> str:
 
 
 def _compiler() -> ContextCompiler:
-    return ContextCompiler(
-        _configured_repository_root(),
-        knowledge_root=_SETTINGS.governance.knowledge,
-        catalog_path=_SETTINGS.governance.catalog,
-        store=_change_context_store(),
-    )
+    global _compiler_instance, _compiler_store
+    store = _change_context_store()
+    if _compiler_instance is None or _compiler_store is not store:
+        _compiler_instance = ContextCompiler(
+            _configured_repository_root(),
+            knowledge_root=_SETTINGS.governance.knowledge,
+            catalog_path=_SETTINGS.governance.catalog,
+            store=store,
+            reuse_index=True,
+        )
+        _compiler_store = store
+    return _compiler_instance
 
 
-@mcp.tool(description="从任务、仓库和基线版本真实编译只读 Context Pack；没有副作用。", annotations=_READ_ONLY)
+def _knowledge() -> KnowledgeRepository:
+    """Reuse the in-memory knowledge index until a governed file changes."""
+    global _knowledge_repository, _knowledge_signature
+    with _knowledge_lock:
+        root = _SETTINGS.governance.knowledge
+        signature = tuple(
+            (path.name, sha256(path.read_bytes()).hexdigest())
+            for path in sorted(root.glob("*.md"))
+        )
+        if _knowledge_repository is None or signature != _knowledge_signature:
+            replacement = KnowledgeRepository.memory()
+            try:
+                ingest_directory(root, replacement, quarantine_on_rejection=False)
+            except Exception:
+                replacement.close()
+                raise
+            previous = _knowledge_repository
+            _knowledge_repository = replacement
+            _knowledge_signature = signature
+            if previous is not None:
+                previous.close()
+        return _knowledge_repository
+
+
+def _evaluator(root: Path) -> ChangeEvaluator:
+    key = (root.resolve(), id(_approval_store))
+    evaluator = _evaluators.get(key)
+    if evaluator is None:
+        evaluator = ChangeEvaluator(
+            root,
+            approval_store=_approval_store,
+            governance=_SETTINGS.governance,
+        )
+        _evaluators[key] = evaluator
+    return evaluator
+
+
+def _impact_service(root: Path) -> ImpactService:
+    key = root.resolve()
+    service = _impact_services.get(key)
+    if service is None:
+        service = ImpactService(key, load_catalog(_SETTINGS.governance.catalog))
+        _impact_services[key] = service
+    return service
+
+
+@mcp.tool(description="Compile and persist a Context Pack from a task, repositories, and base revisions.", annotations=_PERSISTENT_WRITE)
 def prepare_change(
     task: str | None = None,
     repos: list[str] | None = None,
     base_revisions: dict[str, str] | None = None,
     token_budget: int = 2000,
     diff_text: str | None = None,
+    hint_symbols: list[str] | None = None,
 ) -> dict[str, object]:
     """Compile task input; ``diff_text`` returns an explicitly marked legacy decision adapter."""
     if diff_text is not None:
@@ -210,18 +298,17 @@ def prepare_change(
         base_revisions,
         _caller_principal(),
         token_budget,
+        hint_symbols=hint_symbols,
     ).model_dump(mode="json")
 
 
-@mcp.tool(description="按 ACL、版本和 scope 检索团队知识；只读且没有副作用。", annotations=_READ_ONLY)
+@mcp.tool(description="Search team knowledge by ACL, revision, and scope. Read-only with no side effects.", annotations=_READ_ONLY)
 def search_team_knowledge(
     query: str, scope: str, revision: str, limit: int = 5
 ) -> dict[str, object]:
     """Search revision-pinned knowledge under server-authenticated caller ACLs."""
-    repository = KnowledgeRepository.memory()
-    try:
-        ingest_directory(_SETTINGS.governance.knowledge, repository)
-        result = HybridSearch(repository, LocalVectorAdapter()).search(
+    with _knowledge_lock:
+        result = HybridSearch(_knowledge(), LocalVectorAdapter()).search(
             SearchRequest(
                 query=query,
                 scope=scope,
@@ -230,40 +317,37 @@ def search_team_knowledge(
                 limit=limit,
             )
         )
-        return result.model_dump(mode="json")
-    finally:
-        repository.close()
+    return result.model_dump(mode="json")
 
 
-@mcp.tool(description="解释指定的已索引符号及其真实图证据；只读且没有副作用。", annotations=_READ_ONLY)
+@mcp.tool(description="Explain an indexed symbol and its graph evidence. Read-only with no side effects.", annotations=_READ_ONLY)
 def explain_symbol(symbol: str, revision: str) -> dict[str, object]:
     """Return indexed symbol details and graph evidence."""
     return SymbolService(_configured_repository_root()).explain(symbol, revision).model_dump(mode="json")
 
 
-@mcp.tool(description="基于真实图快照分析影响路径、未知边界和必需测试；只读且没有副作用。", annotations=_READ_ONLY)
+@mcp.tool(description="Analyze impact paths, unknown boundaries, and required tests from the graph. Read-only.", annotations=_READ_ONLY)
 def analyze_impact(changed_symbol: str, revision: str, capability: str = "coupon_redemption") -> dict[str, object]:
     """Analyze the impact path for an indexed symbol."""
-    catalog = load_catalog(_SETTINGS.governance.catalog)
-    return ImpactService(_configured_repository_root(), catalog).analyze(
+    return _impact_service(_configured_repository_root()).analyze(
         changed_symbol, revision, capability
     ).model_dump(mode="json")
 
 
-@mcp.tool(description="只读确定性 unified diff 校验：不写入文件、不调用外部服务。P5 将与聚合决策分叉。", annotations=_READ_ONLY)
+@mcp.tool(description="Validate a unified diff with deterministic policy checks. Read-only and offline.", annotations=_READ_ONLY)
 def validate_patch(diff_text: str) -> ChangeSafetyCard:
     """Validate a unified diff with the deterministic policy checks."""
     return evaluate_change(diff_text)
 
 
-@mcp.tool(description="按语义 catalog 选择必需测试；只读且没有副作用。", annotations=_READ_ONLY)
+@mcp.tool(description="Select required tests for a capability and policy from the semantic catalog. Read-only.", annotations=_READ_ONLY)
 def get_required_tests(capability: str, policy_id: str) -> list[dict[str, object]]:
     """Return required tests for a capability and policy."""
     catalog = load_catalog(_SETTINGS.governance.catalog)
     return [item.model_dump() for item in select_required_tests(catalog, capability, policy_id)]
 
 
-@mcp.tool(description="写入审批请求：持久化审批记录（显式副作用写工具）；仅在客户端批准该写工具时执行。", annotations=_WRITE)
+@mcp.tool(description="Create or advance a persisted approval request. This tool writes approval state.", annotations=_WRITE)
 def request_approval(
     change_context_id: str,
     policy_revision: str,
@@ -310,27 +394,76 @@ def request_approval(
     return existing.model_dump(mode="json")
 
 
-@mcp.tool(description="聚合确定性校验为四态决定、证据链、必需测试和审批人；只读且没有副作用。", annotations=_READ_ONLY)
+@mcp.tool(description="Aggregate deterministic checks into a four-state decision with evidence and next actions. Read-only.", annotations=_READ_ONLY)
 def get_change_decision(
     diff_text: str,
     repository_root: str | None = None,
     change_context_id: str | None = None,
     policy_revision: str = "phase5",
+    base_revisions: dict[str, object] | None = None,
 ) -> ChangeDecision:
     """Return a canonical decision; untrusted MCP callers cannot assert CI test success."""
     root = _resolve_repository_root(repository_root)
+    context = None
     if change_context_id is not None:
-        _authorized_context(change_context_id)
-        _approval_service()
-    store = _approval_store
-    return ChangeEvaluator(root, approval_store=store, governance=_SETTINGS.governance).evaluate(
-        EvaluationRequest(
-            diff_text=diff_text,
-            repository_root=root,
-            change_context_id=change_context_id,
-            policy_revision=policy_revision,
+        context = _authorized_context(change_context_id)
+        if root != _configured_repository_root():
+            raise ToolError("change context repository root mismatch")
+    evaluation_revisions = dict(base_revisions or {})
+    if context is not None:
+        context_revisions: dict[str, object] = {
+            **context.base_revisions,
+            "__index__": context.index_revision,
+        }
+        if base_revisions is not None and evaluation_revisions != context_revisions:
+            raise ToolError("base_revisions do not match the persisted change context")
+        evaluation_revisions = context_revisions
+    approval_reader: SqliteApprovalStore | None = None
+    approval_path = _approval_path()
+    approval_wal = Path(f"{approval_path}-wal")
+    if (
+        context is not None
+        and _approval_store is None
+        and approval_path.is_file()
+        and not approval_wal.exists()
+    ):
+        approval_reader = SqliteApprovalStore(approval_path, read_only=True)
+    evaluator = (
+        ChangeEvaluator(
+            root,
+            approval_store=approval_reader,
+            governance=_SETTINGS.governance,
         )
+        if approval_reader is not None
+        else _evaluator(root)
     )
+    try:
+        return evaluator.evaluate(
+            EvaluationRequest(
+                diff_text=diff_text,
+                repository_root=root,
+                change_context_id=change_context_id,
+                policy_revision=policy_revision,
+                base_revisions=evaluation_revisions,
+                prepared_required_tests=(
+                    sorted(str(item.get("id")) for item in context.required_tests)
+                    if context is not None
+                    else None
+                ),
+                prepared_required_approvers=(
+                    context.required_approvers if context is not None else None
+                ),
+            prepared_graph_content_digest=(
+                context.graph_content_digest if context is not None else None
+            ),
+            prepared_knowledge_content_digest=(
+                context.knowledge_content_digest if context is not None else None
+            ),
+            )
+        )
+    finally:
+        if approval_reader is not None:
+            approval_reader.close()
 
 
 @mcp.resource("bizguard://changes/{change_context_id}")

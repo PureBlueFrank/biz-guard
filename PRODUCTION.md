@@ -96,6 +96,8 @@ SQLite 存储使用 WAL、FULL synchronous、30 秒 busy timeout 和进程内并
 3. 只将具有确定性 Validator、误报达标、已演练豁免和回退的 critical Policy 升级为 blocking。
 4. 出现索引落后、Provider 故障、审批存储异常或误拦时，立即将 Policy 回退到 warning，保留审计记录。
 
+每次决策都会输出实际违规或关键未知的 `shadow_findings`；已通过的 shadow 检查不计为命中。指标聚合的 `shadow_hit_count` 是 finding 总数，`shadow_hit_rate` 是至少有一个命中的决策样本占比。这些命中只用于观察与误报校准，不改变决策；warning 命中转为审批，只有 blocking 的 critical 违规才会直接阻断。
+
 ## 六、生产自检
 
 ```bash

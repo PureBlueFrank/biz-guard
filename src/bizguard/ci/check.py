@@ -25,10 +25,12 @@ def evaluate(
     test_evidence: list[TestEvidence] | None = None,
     change_context_id: str | None = None,
     approval_store: SqliteApprovalStore | None = None,
+    evaluator: ChangeEvaluator | None = None,
 ) -> dict[str, object]:
     """Recompute only from diff content; ignore any caller-provided result/cache."""
     root = repository_root or _DEFAULT_REPOSITORY_ROOT
-    decision = ChangeEvaluator(root, approval_store=approval_store).evaluate(
+    service = evaluator or ChangeEvaluator(root, approval_store=approval_store)
+    decision = service.evaluate(
         EvaluationRequest(
             diff_text=diff_text,
             repository_root=root,

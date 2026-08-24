@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import re
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from bizguard.diff_parser import DiffParseError, ParsedDiff, parse
+from bizguard.diff_reconstruct import ReconstructionError, reconstruct_file
 from bizguard.policy.invariants import PolicyLoadError, load_invariants
 from bizguard.rag.injector import load_contract_registry, load_knowledge_documents, inject_full_text
 
@@ -67,9 +67,6 @@ class ChangeSafetyCard(BaseModel):
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
-
-
 def evaluate_change(
     diff_text: str,
     *,
@@ -144,7 +141,7 @@ def evaluate_parsed(
             continue
         try:
             full_text = _reconstruct_target(parsed_diff, invariant.target.file)
-        except ValueError as exc:
+        except (OSError, UnicodeError, ReconstructionError, ValueError) as exc:
             message = f"无法应用 diff 重建变更后文本: {exc}"
             findings.append(
                 Finding(
@@ -196,41 +193,10 @@ def _service_path(parsed_file: object) -> str:
 
 
 def _reconstruct_target(parsed_diff: ParsedDiff, target_path: str) -> str:
-    """Apply matching hunks to the repository base file without mutating it."""
+    """Use the canonical fail-closed reconstructor for the legacy adapter."""
     parsed_file = next(
         (file for file in parsed_diff.files if _service_path(file) == target_path), None
     )
     if parsed_file is None:
         raise ValueError("target file was not changed")
-    base_path = _PROJECT_ROOT / target_path
-    if not base_path.is_file():
-        raise ValueError(f"repository base file does not exist: {target_path}")
-    lines = base_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    for hunk in parsed_file.hunks:
-        match = _HUNK_HEADER.match(hunk.header)
-        if match is None:
-            raise ValueError(f"invalid hunk header: {hunk.header}")
-        replacement: list[str] = []
-        expected: list[str] = []
-        for line in hunk.lines:
-            if not line:
-                raise ValueError("empty hunk line")
-            marker, content = line[0], line[1:] + "\n"
-            if marker in (" ", "-"):
-                expected.append(content)
-            if marker in (" ", "+"):
-                replacement.append(content)
-            elif marker != "-":
-                raise ValueError(f"unsupported hunk line: {line}")
-        position = _find_hunk(lines, expected)
-        if position is None:
-            raise ValueError("hunk context does not match repository base")
-        lines[position : position + len(expected)] = replacement
-    return "".join(lines)
-
-
-def _find_hunk(lines: list[str], expected: list[str]) -> int | None:
-    for position in range(len(lines) - len(expected) + 1):
-        if lines[position : position + len(expected)] == expected:
-            return position
-    return None
+    return reconstruct_file(parsed_file, _PROJECT_ROOT).after

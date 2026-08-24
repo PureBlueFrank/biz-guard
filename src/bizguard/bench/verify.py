@@ -258,7 +258,7 @@ def _verify_phase5(manifest_path: Path) -> int:
     for case in approval_cases:
         if not isinstance(case, dict):
             raise ValueError("phase5 approval case must be a mapping")
-        service = ApprovalService(available=bool(case.get("available", True)))
+        service = ApprovalService()
         request = service.create(ApprovalRequest(
             change_context_id=str(case["id"]), policy_revision="phase5",
             decision_fingerprint="a" * 64, approvers=tuple(case["approvers"]),

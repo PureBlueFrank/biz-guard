@@ -13,11 +13,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - run: pip install -e .[dev]
+      - run: pip install --prefer-binary --only-binary=tree-sitter,tree-sitter-java -e .[dev]
       - run: python -m ruff check src tests agents_mcp
       - run: python -m ruff check --select D101,D103 src/bizguard agents_mcp
       - run: python -m mypy src tests agents_mcp
-      - run: python -m pytest -q
+      - run: PYTHONHASHSEED=0 python -m pytest -q
   gate:
     needs: verify
     runs-on: ubuntu-latest
@@ -44,6 +44,8 @@ jobs:
           git archive "${{ github.event.pull_request.base.sha }}" | tar -x -C "$RUNNER_TEMP/bizguard-trusted"
           python -m venv "$RUNNER_TEMP/bizguard-venv"
           "$RUNNER_TEMP/bizguard-venv/bin/pip" install \
+            --prefer-binary \
+            --only-binary=tree-sitter,tree-sitter-java \
             --constraint "$RUNNER_TEMP/bizguard-trusted/requirements-production.lock" \
             "$RUNNER_TEMP/bizguard-trusted"
       - name: BizGuard safety gate
@@ -60,7 +62,7 @@ jobs:
           "$RUNNER_TEMP/bizguard-venv/bin/python" -m bizguard.ci.runner \
             --diff /tmp/pr.diff \
             --base-revisions /tmp/base-revisions.yaml \
-            --repository-root . \
+            --repository-root "$RUNNER_TEMP/bizguard-trusted" \
             --test-root fixtures/java-microservices \
             --test-evidence-out /tmp/bizguard-test-evidence.json \
             --audit-log /tmp/bizguard-audit.json \

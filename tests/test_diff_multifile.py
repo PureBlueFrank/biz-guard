@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -224,3 +225,76 @@ diff --git a/db/V2__ledger.sql b/db/V2__ledger.sql
         EvaluationRequest(diff_text=diff, repository_root=tmp_path, tests_passed=True)
     )
     assert decision.findings[0].violated is False
+
+
+def test_policy_validation_reconstructs_when_worktree_already_contains_change(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repositories"
+    shutil.copytree(Path(__file__).parents[1] / "fixtures/java-microservices", root)
+    proto = root / "coupon-contract/src/main/resources/coupon.proto"
+    proto.write_text(
+        proto.read_text(encoding="utf-8").replace(" string idempotency_key = 2;", ""),
+        encoding="utf-8",
+    )
+    diff = """\
+diff --git a/coupon-contract/src/main/resources/coupon.proto b/coupon-contract/src/main/resources/coupon.proto
+--- a/coupon-contract/src/main/resources/coupon.proto
++++ b/coupon-contract/src/main/resources/coupon.proto
+@@ -4,1 +4,1 @@
+-message RedeemRequest { string coupon_code = 1; string idempotency_key = 2; }
++message RedeemRequest { string coupon_code = 1; }
+"""
+
+    decision = ChangeEvaluator(root).evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=root, tests_passed=True)
+    )
+
+    assert any(item.violated for item in decision.findings)
+    assert not any("RECONSTRUCTION_INCOMPLETE" in item.id for item in decision.findings)
+    assert decision.decision.value == "REQUIRE_APPROVAL"
+
+
+def test_renaming_governed_proto_to_unmanaged_suffix_cannot_bypass_policy(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repositories"
+    shutil.copytree(Path(__file__).parents[1] / "fixtures/java-microservices", root)
+    old_path = root / "coupon-contract/src/main/resources/coupon.proto"
+    new_path = old_path.with_suffix(".txt")
+    old_path.rename(new_path)
+    diff = """\
+diff --git a/coupon-contract/src/main/resources/coupon.proto b/coupon-contract/src/main/resources/coupon.txt
+similarity index 100%
+rename from coupon-contract/src/main/resources/coupon.proto
+rename to coupon-contract/src/main/resources/coupon.txt
+"""
+
+    decision = ChangeEvaluator(root).evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=root, tests_passed=True)
+    )
+
+    assert any(item.violated and item.public_contract for item in decision.findings)
+    assert decision.decision.value == "REQUIRE_APPROVAL"
+
+
+def test_renaming_proto_to_different_governed_format_is_treated_as_proto_removal(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repositories"
+    shutil.copytree(Path(__file__).parents[1] / "fixtures/java-microservices", root)
+    old_path = root / "coupon-contract/src/main/resources/coupon.proto"
+    old_path.rename(old_path.with_suffix(".yaml"))
+    diff = """\
+diff --git a/coupon-contract/src/main/resources/coupon.proto b/coupon-contract/src/main/resources/coupon.yaml
+similarity index 100%
+rename from coupon-contract/src/main/resources/coupon.proto
+rename to coupon-contract/src/main/resources/coupon.yaml
+"""
+
+    decision = ChangeEvaluator(root).evaluate(
+        EvaluationRequest(diff_text=diff, repository_root=root, tests_passed=True)
+    )
+
+    assert any(item.violated and item.public_contract for item in decision.findings)
+    assert decision.decision.value == "REQUIRE_APPROVAL"

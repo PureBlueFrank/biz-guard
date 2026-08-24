@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from threading import RLock
 
 from pydantic import BaseModel
 
-from bizguard.graph.indexer import index
+from bizguard.graph.indexer import content_digest, index
+from bizguard.graph.models import GraphSnapshot
 from bizguard.impact.analyzer import analyze
 from bizguard.semantic.models import CatalogRequiredTest, SemanticCatalog, load_catalog
 from bizguard.semantic.required_tests import select_required_tests
@@ -20,6 +22,7 @@ class ImpactReport(BaseModel):
     revision: str
     layers: dict[str, list[str]]
     path: list[str]
+    paths: list[list[str]]
     unknown_boundary: bool
     unknown_reason: str | None = None
     evidence: list[dict[str, object]]
@@ -33,6 +36,8 @@ class ImpactService:
     def __init__(self, repositories_root: Path, catalog: SemanticCatalog | None = None) -> None:
         self._root = repositories_root
         self._catalog = catalog or load_catalog(Path(__file__).parents[1] / "semantic" / "catalog.yaml")
+        self._snapshots: dict[str, GraphSnapshot] = {}
+        self._snapshot_lock = RLock()
 
     def analyze(
         self,
@@ -40,8 +45,15 @@ class ImpactService:
         revision: str,
         capability: str | None = "coupon_redemption",
         diff_text: str | None = None,
+        snapshot: GraphSnapshot | None = None,
     ) -> ImpactReport:
-        snapshot = index(self._root, revision)
+        if snapshot is None:
+            digest = content_digest(self._root)
+            with self._snapshot_lock:
+                snapshot = self._snapshots.get(revision)
+                if snapshot is None or snapshot.content_digest != digest:
+                    snapshot = index(self._root, revision)
+                    self._snapshots[revision] = snapshot
         result = analyze(snapshot, changed_symbol, revision)
         capability = capability or self._infer_capability(changed_symbol, diff_text)
         policies = [item for item in self._catalog.policies if item.capability == capability]
@@ -54,6 +66,7 @@ class ImpactService:
             revision=revision,
             layers=result.layers,
             path=result.path,
+            paths=result.paths,
             unknown_boundary=result.unknown_boundary,
             unknown_reason=result.unknown_reason,
             evidence=[item.model_dump(mode="json") for item in result.evidence],

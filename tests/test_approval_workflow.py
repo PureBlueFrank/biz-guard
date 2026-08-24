@@ -32,8 +32,8 @@ def test_expired_waiver_is_not_active() -> None:
     assert not waiver.active()
 
 
-def test_unavailable_service_does_not_auto_allow() -> None:
-    request = ApprovalService(available=False).create(ApprovalRequest(change_context_id="c", policy_revision="r", decision_fingerprint=FINGERPRINT, approvers=("a",), required_cosigns=1))
+def test_unpersisted_service_does_not_auto_allow() -> None:
+    request = ApprovalService().create(ApprovalRequest(change_context_id="c", policy_revision="r", decision_fingerprint=FINGERPRINT, approvers=("a",), required_cosigns=1))
     assert request.state is ApprovalState.PENDING
 
 

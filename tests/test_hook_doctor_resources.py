@@ -10,11 +10,14 @@ ROOT = Path(__file__).parents[1]
 
 def test_hook_delegates_to_recomputation() -> None:
     result = validate((ROOT / "bench/fixtures/phase5/cross-service-dto-breaking.diff").read_text(encoding="utf-8"))
-    assert result.decision.value == "ALLOW_WITH_TESTS"
+    assert result.decision.value == "REQUIRE_APPROVAL"
+    assert "RECONSTRUCTION_INCOMPLETE" in result.findings[0].id
 
 
 def test_install_writes_local_manifest(tmp_path: Path) -> None:
-    assert install(tmp_path).is_file()
+    manifest = install(tmp_path)
+    assert manifest.is_file()
+    assert "bizguard.cli hook --repository ." in manifest.read_text(encoding="utf-8")
 
 
 def test_resource_is_summary_with_evidence_link() -> None:

@@ -64,7 +64,7 @@ def test_redaction_covers_field_names_and_inline_values() -> None:
 
 def test_metrics_export_percentiles_distribution_and_unknown_rate() -> None:
     records = [
-        {"decision": "ALLOW", "duration_ms": 10.0, "unknown": False},
+        {"decision": "ALLOW", "duration_ms": 10.0, "unknown": False, "shadow_findings": 2},
         {"decision": "BLOCK", "duration_ms": 20.0, "unknown": True},
         {"decision": "BLOCK", "duration_ms": 30.0, "unknown": False},
     ]
@@ -74,6 +74,8 @@ def test_metrics_export_percentiles_distribution_and_unknown_rate() -> None:
     assert abs(float(metrics["unknown_rate"]) - 1 / 3) < 1e-9  # type: ignore[arg-type]
     assert metrics["duration_ms_p50"] == 20.0
     assert metrics["duration_ms_p95"] == 29.0
+    assert metrics["shadow_hit_count"] == 2
+    assert abs(float(metrics["shadow_hit_rate"]) - 1 / 3) < 1e-9  # type: ignore[arg-type]
     assert metrics["low_sample"] is True
 
 

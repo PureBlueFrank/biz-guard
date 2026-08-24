@@ -116,7 +116,7 @@ def test_persisted_approval_without_test_evidence_remains_blocked(tmp_path: Path
     assert payload["approval_state"] == "approved"
 
 
-def test_multi_file_violation_in_second_file_fails(tmp_path: Path) -> None:
+def test_multi_file_shadow_finding_in_second_file_is_observable(tmp_path: Path) -> None:
     first = """\
 diff --git a/README.md b/README.md
 --- a/README.md
@@ -136,8 +136,10 @@ diff --git a/coupon-core/src/main/resources/db/V2__ledger.sql b/coupon-core/src/
     diff_path = tmp_path / "multi.diff"
     diff_path.write_text(first + second, encoding="utf-8")
     completed = _run_gate(diff_path)
-    assert completed.returncode == 1
-    assert json.loads(completed.stdout)["decision"] == "BLOCK"
+    assert completed.returncode == 0
+    payload = json.loads(completed.stdout)
+    assert payload["decision"] == "ALLOW"
+    assert payload["shadow_findings"]
 
 
 def test_missing_base_revisions_returns_exit_two(tmp_path: Path) -> None:

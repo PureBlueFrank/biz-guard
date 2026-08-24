@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from bizguard.decision.v2 import DecisionState, FindingV2
+from bizguard.decision.v2 import DecisionState, FindingV2, NextAction
 from bizguard.semantic.models import CatalogRequiredTest
 
 
@@ -31,6 +31,10 @@ class EvaluationRequest(BaseModel):
     test_evidence: list[TestEvidence] = Field(default_factory=list)
     change_context_id: str | None = None
     trace_id: str | None = None
+    prepared_required_tests: list[str] | None = None
+    prepared_required_approvers: list[str] | None = None
+    prepared_graph_content_digest: str | None = None
+    prepared_knowledge_content_digest: str | None = None
 
 
 class ChangeDecision(BaseModel):
@@ -49,3 +53,5 @@ class ChangeDecision(BaseModel):
     decision_fingerprint: str
     approval_state: str | None = None
     trace_id: str | None = None
+    shadow_findings: list[str] = Field(default_factory=list)
+    next_actions: list[NextAction] = Field(default_factory=list)

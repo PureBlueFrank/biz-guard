@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from pytest import CaptureFixture
 
 from bizguard.cli import main
@@ -77,3 +78,55 @@ def test_required_tests_cli_delegates_to_catalog(capsys: CaptureFixture[str]) ->
     catalog = load_catalog(ROOT / "src/bizguard/semantic/catalog.yaml")
     expected = [item.model_dump() for item in select_required_tests(catalog, "coupon_redemption", policy)]
     assert json.loads(capsys.readouterr().out) == expected
+
+
+def test_onboarding_bootstrap_creates_only_missing_shadow_templates(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    (tmp_path / "app.py").write_text("print('ready')\n", encoding="utf-8")
+    existing = tmp_path / "registry/contracts.yaml"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("version: 1\ncontracts: [managed]\n", encoding="utf-8")
+
+    assert main(["onboarding", "--repository", str(tmp_path), "--bootstrap"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["suitable"] is True
+    assert "policy/phase5-registry.yaml" in payload["bootstrap"]["created"]
+    assert existing.read_text(encoding="utf-8") == "version: 1\ncontracts: [managed]\n"
+    assert "mode: shadow" in (tmp_path / "policy/phase5-registry.yaml").read_text(
+        encoding="utf-8"
+    )
+
+    assert main(["doctor", "--repository", str(tmp_path), "--json"]) == 0
+    doctor = json.loads(capsys.readouterr().out)
+    assert doctor["ok"] is True
+    assert doctor["checks"]["catalog"] == "ok"
+    assert doctor["checks"]["graph"] == "ok"
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "invalid_content", "check"),
+    [
+        ("semantic/catalog.yaml", "capabilities: wrong\n", "catalog"),
+        ("policy/phase5-registry.yaml", "policies: wrong\n", "policy"),
+    ],
+)
+def test_doctor_parses_local_governance_instead_of_only_checking_file_exists(
+    tmp_path: Path,
+    capsys: CaptureFixture[str],
+    relative_path: str,
+    invalid_content: str,
+    check: str,
+) -> None:
+    (tmp_path / "app.py").write_text("print('ready')\n", encoding="utf-8")
+    assert main(["onboarding", "--repository", str(tmp_path), "--bootstrap"]) == 0
+    capsys.readouterr()
+    target = tmp_path / relative_path
+    target.write_text(invalid_content, encoding="utf-8")
+
+    assert main(["doctor", "--repository", str(tmp_path), "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["ok"] is False
+    assert payload["checks"][check] == "failed"

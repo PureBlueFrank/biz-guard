@@ -1,4 +1,4 @@
-"""AST validation of deterministic policy invariants."""
+"""Deterministic structural validation of governed policy artifacts."""
 
 import ast
 import re
@@ -11,7 +11,14 @@ from bizguard.diff_parser import ParsedDiff
 from bizguard.policy.invariants import Invariant
 
 
-def validate_artifact(policy_id: str, source: str, path: str, severity: str = "high") -> dict[str, object]:
+def validate_artifact(
+    policy_id: str,
+    source: str,
+    path: str,
+    severity: str = "high",
+    *,
+    baseline_source: str | None = None,
+) -> dict[str, object]:
     """Validate non-Python public artifacts from their content, never their filename.
 
     The checks deliberately use syntax/content semantics that are available offline:
@@ -23,17 +30,26 @@ def validate_artifact(policy_id: str, source: str, path: str, severity: str = "h
     lower = source.lower()
     violated = False
     message = "artifact is compatible"
-    if suffix in {".yaml", ".yml", ".json"} and ("openapi" in lower or "paths:" in lower):
-        violated = _openapi_has_missing_required_field(source) or bool(
-            re.search(r"^\s*-\s*(id|status|code)\s*$", source, re.MULTILINE)
+    baseline_lower = baseline_source.lower() if baseline_source is not None else ""
+    api_markers = ("openapi", "swagger", "paths:", "components:", "definitions:")
+    if suffix in {".yaml", ".yml", ".json"} and any(
+        marker in lower or marker in baseline_lower for marker in api_markers
+    ):
+        violated = _openapi_has_missing_required_field(source) or (
+            baseline_source is not None
+            and _openapi_removed_fields(baseline_source, source)
         )
         message = "published OpenAPI field removed" if violated else message
     elif suffix == ".proto":
-        violated = bool(not re.search(r"\b\w+\s+(id|status)\s*=", source) and "message" in lower)
+        current_fields = _proto_fields(source)
+        if baseline_source is not None:
+            baseline_fields = _proto_fields(baseline_source)
+            violated = any(current_fields.get(key) != number for key, number in baseline_fields.items())
+        else:
+            violated = bool("message" in lower and not any(name in {"id", "status"} for _, name in current_fields))
         message = "published Proto required field missing" if violated else message
     elif suffix == ".sql":
-        has_write = bool(re.search(r"\b(alter|update|delete|insert)\b", lower))
-        violated = has_write and "transaction" not in lower and "begin" not in lower
+        violated = _sql_has_untransactional_write(source)
         message = "migration write is not transactional" if violated else message
     elif suffix in {".avsc", ".schema"}:
         violated = "schema_version" not in lower and "version" not in lower
@@ -48,8 +64,240 @@ def validate_artifact(policy_id: str, source: str, path: str, severity: str = "h
         "effect": message,
         "remediation": "restore compatibility or provide a versioned migration",
         "confidence": 1.0,
+        "precision": "high" if suffix in {".yaml", ".yml", ".json"} else "medium",
         "evidence": [path],
     }
+
+
+def _proto_fields(source: str) -> dict[tuple[str, str], int]:
+    """Extract fields from nested messages and oneofs with balanced-brace parsing."""
+    token_pattern = re.compile(
+        r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*.*?\*/|'
+        r"[A-Za-z_]\w*|\d+|[{};=<>\[\],.]",
+        flags=re.DOTALL,
+    )
+    tokens = [
+        token
+        for token in token_pattern.findall(source)
+        if not token.startswith(("//", "/*", '"', "'"))
+    ]
+    fields: dict[tuple[str, str], int] = {}
+
+    def record(statement: list[str], message_name: str | None) -> None:
+        if message_name is None or "=" not in statement:
+            return
+        equals = statement.index("=")
+        identifiers = [token for token in statement[:equals] if re.fullmatch(r"\w+", token)]
+        if len(identifiers) < 2 or identifiers[0] in {
+            "option",
+            "reserved",
+            "extensions",
+            "rpc",
+        }:
+            return
+        number = next(
+            (int(token) for token in statement[equals + 1 :] if token.isdigit()),
+            None,
+        )
+        if number is not None:
+            fields[(message_name, identifiers[-1])] = number
+
+    def parse_scope(position: int, message_name: str | None) -> int:
+        statement: list[str] = []
+        while position < len(tokens):
+            token = tokens[position]
+            if token == "}":
+                record(statement, message_name)
+                return position + 1
+            if token == "message" and position + 1 < len(tokens):
+                nested = tokens[position + 1]
+                brace = position + 2
+                while brace < len(tokens) and tokens[brace] != "{":
+                    brace += 1
+                if brace == len(tokens):
+                    return len(tokens)
+                qualified = f"{message_name}.{nested}" if message_name else nested
+                position = parse_scope(brace + 1, qualified)
+                statement = []
+                continue
+            if token == "oneof":
+                brace = position + 1
+                while brace < len(tokens) and tokens[brace] != "{":
+                    brace += 1
+                if brace == len(tokens):
+                    return len(tokens)
+                position = parse_scope(brace + 1, message_name)
+                statement = []
+                continue
+            if token == "{":
+                position = parse_scope(position + 1, message_name)
+                statement = []
+                continue
+            if token == ";":
+                record(statement, message_name)
+                statement = []
+            else:
+                statement.append(token)
+            position += 1
+        record(statement, message_name)
+        return position
+
+    parse_scope(0, None)
+    return fields
+
+
+def _openapi_removed_fields(before: str, after: str) -> bool:
+    """Compare named schema properties across two OpenAPI documents."""
+    try:
+        old_document = yaml.safe_load(before)
+        new_document = yaml.safe_load(after)
+    except yaml.YAMLError:
+        return True
+    old = _openapi_schema_properties(old_document)
+    new = _openapi_schema_properties(new_document)
+    return any(not fields.issubset(new.get(schema, set())) for schema, fields in old.items())
+
+
+def _openapi_schema_properties(document: object) -> dict[str, set[tuple[str, ...]]]:
+    """Collect property paths from named and inline OpenAPI/Swagger schemas."""
+    if not isinstance(document, dict):
+        return {}
+    collected: dict[str, set[tuple[str, ...]]] = {}
+
+    def schema_fields(schema: object, prefix: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
+        if not isinstance(schema, dict):
+            return set()
+        result: set[tuple[str, ...]] = set()
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            for name, child in properties.items():
+                field_path = (*prefix, str(name))
+                result.add(field_path)
+                result.update(schema_fields(child, field_path))
+        for composition in ("allOf", "oneOf", "anyOf"):
+            branches = schema.get(composition)
+            if isinstance(branches, list):
+                for branch in branches:
+                    result.update(schema_fields(branch, prefix))
+        if "items" in schema:
+            result.update(schema_fields(schema["items"], (*prefix, "[]")))
+        if "additionalProperties" in schema:
+            result.update(
+                schema_fields(schema["additionalProperties"], (*prefix, "{}"))
+            )
+        return result
+
+    def add_named(container: object, prefix: str) -> None:
+        if not isinstance(container, dict):
+            return
+        for name, schema in container.items():
+            collected[f"{prefix}/{name}"] = schema_fields(schema)
+
+    components = document.get("components")
+    if isinstance(components, dict):
+        add_named(components.get("schemas"), "components/schemas")
+    add_named(document.get("definitions"), "definitions")
+
+    def collect_inline(node: object, path: tuple[str, ...]) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                child_path = (*path, str(key))
+                if key == "schema" and isinstance(value, dict):
+                    collected["/".join(child_path)] = schema_fields(value)
+                collect_inline(value, child_path)
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                collect_inline(value, (*path, str(index)))
+
+    collect_inline(document.get("paths"), ("paths",))
+    return collected
+
+
+def _sql_has_untransactional_write(source: str) -> bool:
+    """Check top-level SQL write tokens, including writes following CTE clauses."""
+    in_transaction = False
+    writes = {"alter", "create", "drop", "truncate", "update", "delete", "insert", "merge"}
+    for tokens in _sql_top_level_statements(source):
+        if not tokens:
+            continue
+        if tokens[0] == "begin" or tokens[:2] == ["start", "transaction"]:
+            in_transaction = True
+            continue
+        if tokens[0] in {"commit", "rollback"}:
+            in_transaction = False
+            continue
+        if writes.intersection(tokens) and not in_transaction:
+            return True
+    return False
+
+
+def _sql_top_level_statements(source: str) -> list[list[str]]:
+    """Tokenize SQL outside strings/comments and ignore words nested in parentheses."""
+    statements: list[list[str]] = [[]]
+    token: list[str] = []
+    depth = 0
+    position = 0
+    quote: str | None = None
+    line_comment = False
+    block_comment = False
+
+    def flush() -> None:
+        if token and depth == 0:
+            statements[-1].append("".join(token).lower())
+        token.clear()
+
+    while position < len(source):
+        char = source[position]
+        following = source[position + 1] if position + 1 < len(source) else ""
+        if line_comment:
+            if char == "\n":
+                line_comment = False
+            position += 1
+            continue
+        if block_comment:
+            if char == "*" and following == "/":
+                block_comment = False
+                position += 2
+            else:
+                position += 1
+            continue
+        if quote is not None:
+            if char == quote:
+                if following == quote:
+                    position += 2
+                    continue
+                quote = None
+            position += 1
+            continue
+        if char == "-" and following == "-":
+            flush()
+            line_comment = True
+            position += 2
+            continue
+        if char == "/" and following == "*":
+            flush()
+            block_comment = True
+            position += 2
+            continue
+        if char in {"'", '"'}:
+            flush()
+            quote = char
+        elif char == "(":
+            flush()
+            depth += 1
+        elif char == ")":
+            flush()
+            depth = max(0, depth - 1)
+        elif char == ";" and depth == 0:
+            flush()
+            statements.append([])
+        elif char.isalnum() or char in {"_", "$"}:
+            token.append(char)
+        else:
+            flush()
+        position += 1
+    flush()
+    return [statement for statement in statements if statement]
 
 
 def _openapi_has_missing_required_field(source: str) -> bool:

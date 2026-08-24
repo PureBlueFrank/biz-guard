@@ -1,4 +1,5 @@
 from pathlib import Path
+from threading import Thread
 
 import pytest
 import yaml  # type: ignore[import-untyped]
@@ -8,6 +9,24 @@ from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest, SearchResult
 from bizguard.knowledge.repository import KnowledgeRepository
 from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
+
+
+def test_memory_repository_can_be_reused_across_worker_threads() -> None:
+    repository = KnowledgeRepository.memory()
+    errors: list[Exception] = []
+
+    def search_from_worker() -> None:
+        try:
+            repository.all()
+        except Exception as exc:  # pragma: no cover - asserted through the shared list
+            errors.append(exc)
+
+    worker = Thread(target=search_from_worker)
+    worker.start()
+    worker.join()
+    repository.close()
+
+    assert errors == []
 
 
 @pytest.fixture()

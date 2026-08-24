@@ -15,6 +15,7 @@ from typing import cast
 import yaml  # type: ignore[import-untyped]
 
 from bizguard.change.models import TestEvidence
+from bizguard.change.evaluator import ChangeEvaluator, index_revision
 from bizguard.ci.check import evaluate, gate_exit_code
 from bizguard.observability import audit_json
 from bizguard.semantic.models import CatalogRequiredTest
@@ -96,16 +97,18 @@ def run_gate(
     approval_store: SqliteApprovalStore | None = None,
 ) -> tuple[dict[str, object], list[TestEvidence]]:
     """Discover, execute, and bind every required test to the evaluated revision."""
+    evaluator = ChangeEvaluator(repository_root, approval_store=approval_store)
     initial = evaluate(
         diff_text,
         base_revisions,
         repository_root,
         change_context_id=change_context_id,
         approval_store=approval_store,
+        evaluator=evaluator,
     )
     raw_required = cast(list[object], initial["required_tests"])
     required = [CatalogRequiredTest.model_validate(item) for item in raw_required]
-    revision = str(base_revisions.get("revision", "phase3-fixture-v1"))
+    revision = index_revision(base_revisions)
     evidence = [
         _execute_test(test, test_root, revision, timeout_seconds)
         for test in required
@@ -117,6 +120,7 @@ def run_gate(
         test_evidence=evidence,
         change_context_id=change_context_id,
         approval_store=approval_store,
+        evaluator=evaluator,
     )
     return final, evidence
 

@@ -44,7 +44,14 @@ def test_mcp_tools_are_registered_with_json_schemas() -> None:
     for tool in by_name.values():
         assert tool.inputSchema["properties"]
         assert tool.outputSchema is not None
-        assert "只读" in (tool.description or "") or tool.name == "request_approval"
+        assert "read-only" in (tool.description or "").lower() or tool.name in {
+            "prepare_change",
+            "request_approval",
+        }
+    prepare_annotations = by_name["prepare_change"].annotations
+    assert prepare_annotations is not None
+    assert prepare_annotations.readOnlyHint is False
+    assert prepare_annotations.destructiveHint is False
     assert by_name["validate_patch"].inputSchema["properties"]["diff_text"]["type"] == "string"
     assert by_name["get_change_decision"].inputSchema["properties"]["diff_text"]["type"] == "string"
 

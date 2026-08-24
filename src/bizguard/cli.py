@@ -2,10 +2,13 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+
+import yaml  # type: ignore[import-untyped]
 
 from bizguard.decision import (
     ChangeSafetyCard,
@@ -57,6 +60,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare_parser.add_argument("--principal", default="engineering")
     prepare_parser.add_argument("--token-budget", type=int, default=2000)
     prepare_parser.add_argument("--json", action="store_true")
+    prepare_parser.add_argument("--repository-root", type=Path, default=None)
     impact_parser.add_argument("--change-context", type=Path)
     impact_parser.add_argument("--json", action="store_true")
     knowledge_parser = subparsers.add_parser("knowledge")
@@ -68,23 +72,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     knowledge_search.add_argument("--roles", nargs="+", default=["engineering"])
     knowledge_search.add_argument("--json", action="store_true")
     knowledge_search.add_argument("--require-real-embedding", action="store_true")
+    knowledge_search.add_argument("--repository-root", type=Path, default=None)
     symbol_parser = subparsers.add_parser("symbol")
     symbol_subparsers = symbol_parser.add_subparsers(dest="symbol_command", required=True)
     symbol_explain = symbol_subparsers.add_parser("explain")
     symbol_explain.add_argument("--symbol", required=True)
     symbol_explain.add_argument("--revision", required=True)
     symbol_explain.add_argument("--json", action="store_true")
+    symbol_explain.add_argument("--repository-root", type=Path, default=None)
     tests_parser = subparsers.add_parser("tests")
     tests_subparsers = tests_parser.add_subparsers(dest="tests_command", required=True)
     tests_required = tests_subparsers.add_parser("required")
     tests_required.add_argument("--capability", required=True)
     tests_required.add_argument("--policy", required=True)
     tests_required.add_argument("--json", action="store_true")
+    tests_required.add_argument("--repository-root", type=Path, default=None)
     hook_parser = subparsers.add_parser("hook")
     hook_parser.add_argument("--repository", type=Path, default=None)
     init_parser = subparsers.add_parser("init")
     init_parser.add_argument("--repository", type=Path, default=None)
     init_parser.add_argument("--dry-run", action="store_true")
+    init_parser.add_argument("--bootstrap", action="store_true")
+    onboarding_parser = subparsers.add_parser("onboarding")
+    onboarding_parser.add_argument("--repository", type=Path, default=None)
+    onboarding_parser.add_argument("--bootstrap", action="store_true")
+    onboarding_parser.add_argument("--dry-run", action="store_true")
     connect_parser = subparsers.add_parser("connect")
     connect_parser.add_argument("agent", choices=["claude-code", "codex"])
     connect_parser.add_argument("--repository", type=Path, default=None)
@@ -121,6 +133,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _init(arguments)
     if arguments.command == "connect":
         return _connect(arguments)
+    if arguments.command == "onboarding":
+        return _onboarding(arguments)
     if arguments.command == "verify-install":
         return _verify_install(arguments)
     diff_path = arguments.diff
@@ -149,17 +163,24 @@ def _doctor(arguments: argparse.Namespace) -> int:
     if arguments.production:
         return _production_doctor(arguments.json)
     root = arguments.repository or _project_root()
+    catalog = _local_catalog(root)
+    fixture_repositories = root / "fixtures/java-microservices"
+    graph_root = fixture_repositories if fixture_repositories.is_dir() else root
     checks = {
         "python": _check_python(),
-        "policy": _status((root / "policy" / "phase5-registry.yaml").is_file()),
-        "catalog": _status((root / "src/bizguard/semantic/catalog.yaml").is_file()),
+        "policy": _check_policy(root / "policy" / "phase5-registry.yaml"),
+        "catalog": _check_catalog(catalog),
         "mcp": _check_mcp(),
         "store": _check_store(root),
-        "graph": _check_graph(root / "fixtures/java-microservices"),
-        "ci_workflow": _status((root / ".github" / "workflows" / "bizguard.yml").is_file()),
+        "graph": _check_graph(graph_root),
+        "ci_workflow": (
+            "ok"
+            if (root / ".github" / "workflows" / "bizguard.yml").is_file()
+            else "degraded"
+        ),
         "agent_config": _check_agent_config(root),
     }
-    ok = all(status != "failed" for status in checks.values())
+    ok = all(not status.startswith("failed") for status in checks.values())
     degraded = any(status == "degraded" for status in checks.values())
     payload = {"ok": ok, "degraded": degraded, "checks": checks}
     print(json.dumps(payload, sort_keys=True) if arguments.json else ("ok" if ok else "failed"))
@@ -187,19 +208,35 @@ def _production_doctor(json_output: bool) -> int:
             "store": _check_store(settings.repository_root),
             "graph": _check_graph(settings.repository_root),
         }
-    ok = all(status != "failed" for status in checks.values())
+    ok = all(not status.startswith("failed") for status in checks.values())
     degraded = any(status == "degraded" for status in checks.values())
     payload = {"ok": ok, "degraded": degraded, "checks": checks}
     print(json.dumps(payload, sort_keys=True) if json_output else ("ok" if ok else "failed"))
     return 0 if ok else 1
 
 
-def _status(condition: bool) -> str:
-    return "ok" if condition else "failed"
-
-
 def _check_python() -> str:
     return "ok" if sys.version_info >= (3, 12) else "failed"
+
+
+def _check_catalog(path: Path | None) -> str:
+    if path is None:
+        return "failed"
+    try:
+        load_catalog(path)
+    except (OSError, ValueError, yaml.YAMLError):
+        return "failed"
+    return "ok"
+
+
+def _check_policy(path: Path) -> str:
+    from bizguard.policy.registry import load_registry
+
+    try:
+        load_registry(path)
+    except (OSError, ValueError, yaml.YAMLError):
+        return "failed"
+    return "ok"
 
 
 def _check_production_config() -> str:
@@ -246,8 +283,12 @@ def _check_mcp() -> str:
 
         if len(asyncio.run(mcp.list_tools())) != 8:
             return "degraded"
-    except Exception:
-        return "failed"
+    except ImportError as exc:
+        return f"failed:mcp_dependency_missing:{exc.name or 'unknown'}"
+    except ValueError as exc:
+        return f"failed:governance_configuration:{exc}"
+    except Exception as exc:
+        return f"failed:mcp_startup:{type(exc).__name__}:{exc}"
     return "ok"
 
 
@@ -299,7 +340,7 @@ def _git_output(root: Path, args: list[str]) -> str:
 
 
 def _init(arguments: argparse.Namespace) -> int:
-    root = arguments.repository or _project_root()
+    root = (arguments.repository or Path.cwd()).resolve()
     payload = {
         "languages": _detect_languages(root),
         "build_tool": _detect_build_tool(root),
@@ -307,8 +348,73 @@ def _init(arguments: argparse.Namespace) -> int:
         "codeowners": (root / "CODEOWNERS").is_file() or (root / ".github" / "CODEOWNERS").is_file(),
         "agent_config": _detect_agent_config(root),
     }
+    if arguments.bootstrap:
+        payload["bootstrap"] = _bootstrap(root, dry_run=arguments.dry_run)
     print(json.dumps(payload, sort_keys=True))
     return 0
+
+
+def _onboarding(arguments: argparse.Namespace) -> int:
+    """Report compatibility and optionally create a non-destructive governance skeleton."""
+    root = (arguments.repository or Path.cwd()).resolve()
+    languages = _detect_languages(root)
+    supported = sorted(set(languages) & {"java", "py", "proto", "yaml", "yml", "sql"})
+    payload: dict[str, object] = {
+        "repository": str(root),
+        "supported_inputs": supported,
+        "suitable": bool(supported),
+        "recommendations": [
+            "review generated governance files with the responsible owners",
+            "start every new policy in shadow mode",
+            "run bizguard doctor before enabling an agent connector",
+        ],
+    }
+    if arguments.bootstrap:
+        payload["bootstrap"] = _bootstrap(root, dry_run=arguments.dry_run)
+    print(json.dumps(payload, sort_keys=True))
+    return 0 if supported else 1
+
+
+def _bootstrap(root: Path, *, dry_run: bool) -> dict[str, object]:
+    """Create only missing starter files; never overwrite organization-owned governance."""
+    templates = {
+        root / "policy/phase5-registry.yaml": (
+            "policies:\n"
+            "  - id: replace-with-reviewed-policy\n"
+            "    validator: schema_version\n"
+            "    scope: replace-with-capability\n"
+            "    severity: medium\n"
+            "    owner: replace-with-owner\n"
+            "    remediation: document the safe migration\n"
+            "    required_tests: []\n"
+            "    mode: shadow\n"
+            "    precision: medium\n"
+        ),
+        root / "registry/contracts.yaml": "version: 1\ncontracts: []\n",
+        root / "semantic/catalog.yaml": (
+            "schema_version: 1\nrevision: bootstrap-v1\ncapabilities: []\nowners: []\n"
+            "entities: []\nstates: []\ninvariants: []\npolicies: []\nrequired_tests: []\n"
+        ),
+        root / "knowledge/candidates/bootstrap-draft.md": (
+            "---\nid: bootstrap-draft\ntitle: 待 Owner 审核的业务知识\n"
+            "scope: global\nowner: replace-with-owner\n"
+            "source_uri: repo://knowledge/candidates/bootstrap-draft.md\n"
+            "source_revision: bootstrap-v1\nconfidence: 0.1\nsecurity_label: internal\n"
+            "acl: [engineering]\nstatus: draft\npolicy_ids: []\n"
+            "evidence_uri: repo://knowledge/candidates/bootstrap-draft.md\n---\n"
+            "请由业务 Owner 补充事实、证据与适用边界后再发布。\n"
+        ),
+    }
+    pending = [path for path in templates if not path.exists()]
+    if not dry_run:
+        for path in pending:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(templates[path], encoding="utf-8")
+    return {
+        "created": [] if dry_run else [str(path.relative_to(root)) for path in pending],
+        "would_create": [str(path.relative_to(root)) for path in pending] if dry_run else [],
+        "preserved": [str(path.relative_to(root)) for path in templates if path.exists() and path not in pending],
+    }
 
 
 def _detect_languages(root: Path) -> list[str]:
@@ -380,7 +486,6 @@ def _verify_install(arguments: argparse.Namespace) -> int:
 
 def _impact(arguments: argparse.Namespace) -> int:
     """Build a pinned fixture snapshot and report conservative impact JSON."""
-    import yaml  # type: ignore[import-untyped]
     from bizguard.eval.impact import changed_id_from_diff_text
     from bizguard.graph.indexer import index
     from bizguard.impact.analyzer import analyze
@@ -412,9 +517,18 @@ def _project_root() -> Path:
     return Path(__file__).parents[2]
 
 
+def _repository_root(requested: Path | None = None) -> Path:
+    """Resolve the target repository consistently across CLI commands."""
+    if requested is not None:
+        return requested.resolve()
+    configured = os.environ.get("BIZGUARD_REPOSITORY_ROOT")
+    if configured:
+        return Path(configured).resolve()
+    return (_project_root() / "fixtures/java-microservices").resolve()
+
+
 def _prepare(arguments: argparse.Namespace) -> int:
-    root = _project_root()
-    compiler = ContextCompiler(root / "fixtures/java-microservices")
+    compiler = ContextCompiler(_repository_root(arguments.repository_root), reuse_index=True)
     pack = compiler.compile(
         arguments.task, arguments.repos, arguments.base_revisions, arguments.principal, arguments.token_budget
     )
@@ -429,10 +543,14 @@ def _context_impact(arguments: argparse.Namespace) -> int:
 
 
 def _knowledge_search(arguments: argparse.Namespace) -> int:
-    root = _project_root()
+    from bizguard.production import GovernancePaths
+
+    root = _repository_root(arguments.repository_root)
+    local_knowledge = root / "knowledge/published"
+    knowledge_root = local_knowledge if local_knowledge.is_dir() else GovernancePaths.from_env().knowledge
     repository = KnowledgeRepository.memory()
     try:
-        ingest_directory(root / "knowledge/published", repository)
+        ingest_directory(knowledge_root, repository)
         result = HybridSearch(repository, LocalVectorAdapter()).search(
             SearchRequest(query=arguments.query, scope=arguments.scope, revision=arguments.revision, caller_roles=arguments.roles)
         )
@@ -448,17 +566,28 @@ def _knowledge_search(arguments: argparse.Namespace) -> int:
 
 
 def _symbol_explain(arguments: argparse.Namespace) -> int:
-    root = _project_root()
-    result = SymbolService(root / "fixtures/java-microservices").explain(arguments.symbol, arguments.revision)
+    result = SymbolService(_repository_root(arguments.repository_root)).explain(
+        arguments.symbol, arguments.revision
+    )
     print(result.model_dump_json())
     return 0
 
 
 def _tests_required(arguments: argparse.Namespace) -> int:
-    catalog = load_catalog(_project_root() / "src/bizguard/semantic/catalog.yaml")
+    from bizguard.production import GovernancePaths
+
+    root = _repository_root(arguments.repository_root)
+    local_catalog = _local_catalog(root)
+    catalog = load_catalog(local_catalog or GovernancePaths.from_env().catalog)
     result = [item.model_dump() for item in select_required_tests(catalog, arguments.capability, arguments.policy)]
     print(json.dumps(result, sort_keys=True))
     return 0
+
+
+def _local_catalog(root: Path) -> Path | None:
+    """Resolve either an onboarded project catalog or BizGuard's source-tree catalog."""
+    candidates = (root / "semantic/catalog.yaml", root / "src/bizguard/semantic/catalog.yaml")
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
 
 
 def _invalid_input_card(message: str, refs: list[str] | None = None) -> ChangeSafetyCard:
@@ -481,9 +610,7 @@ def _print_card(card: ChangeSafetyCard) -> None:
 
 
 def _evaluate_change(arguments: argparse.Namespace, diff_text: str) -> ChangeDecision:
-    import yaml
-
-    root = arguments.repository_root or _project_root() / "fixtures" / "java-microservices"
+    root = _repository_root(arguments.repository_root)
     base_revisions: dict[str, object] = {}
     if arguments.base_revisions is not None:
         raw = yaml.safe_load(arguments.base_revisions.read_text(encoding="utf-8")) or {}

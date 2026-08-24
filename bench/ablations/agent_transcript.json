@@ -25,6 +25,8 @@
             "effect": "目标方法缺少要求的幂等保护调用。",
             "id": "redeem-must-check-idempotency-in-transaction",
             "owner": null,
+            "policy_mode": "blocking",
+            "validator_precision": "high",
             "public_contract": false,
             "remediation": "resolve the reported policy finding",
             "required_approver": null,
@@ -58,8 +60,16 @@
         "change_context_id": null,
         "policy_revision": "phase5",
         "base_revisions_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-        "decision_fingerprint": "b2bf4cf143dae9ae4706a7958cc615f1237d315404db28c4640f9b0b48c83047",
+        "decision_fingerprint": "8245c8bc01d6cfb6ac3d96ebab0aabdc76fd1a60b816bac1548eaa7672a918d8",
         "approval_state": null,
+        "shadow_findings": [],
+        "next_actions": [
+          {
+            "tool": "none",
+            "reason": "resolve blocking findings before retrying",
+            "inputs": {}
+          }
+        ],
         "trace_id": null
       },
       "duration_ms": 343.2346389963641

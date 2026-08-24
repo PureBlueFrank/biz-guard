@@ -22,7 +22,7 @@
         "base_revisions_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
         "change_context_id": null,
         "decision": "BLOCK",
-        "decision_fingerprint": "b2bf4cf143dae9ae4706a7958cc615f1237d315404db28c4640f9b0b48c83047",
+        "decision_fingerprint": "8245c8bc01d6cfb6ac3d96ebab0aabdc76fd1a60b816bac1548eaa7672a918d8",
         "evidence": [
           "redeem-must-check-idempotency-in-transaction"
         ],
@@ -33,6 +33,8 @@
             "effect": "\u76ee\u6807\u65b9\u6cd5\u7f3a\u5c11\u8981\u6c42\u7684\u5e42\u7b49\u4fdd\u62a4\u8c03\u7528\u3002",
             "id": "redeem-must-check-idempotency-in-transaction",
             "owner": null,
+            "policy_mode": "blocking",
+            "validator_precision": "high",
             "public_contract": false,
             "remediation": "resolve the reported policy finding",
             "required_approver": null,
@@ -64,6 +66,14 @@
           }
         ],
         "risk_score": 1.0,
+        "shadow_findings": [],
+        "next_actions": [
+          {
+            "inputs": {},
+            "reason": "resolve blocking findings before retrying",
+            "tool": "none"
+          }
+        ],
         "trace_id": null
       },
       "tool": "bizguard.get_change_decision"

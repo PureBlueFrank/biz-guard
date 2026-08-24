@@ -108,9 +108,9 @@ diff --git a/docs/notes.txt b/docs/notes.txt
 @pytest.mark.parametrize(
     ("diff_text", "tests_passed", "expected"),
     [
-        (SQL_NON_TRANSACTIONAL, True, "BLOCK"),
-        (AVSC_WITHOUT_VERSION, True, "BLOCK"),
-        (_fixture("cross-service-dto-breaking.diff"), None, "ALLOW_WITH_TESTS"),
+        (SQL_NON_TRANSACTIONAL, True, "ALLOW"),
+        (AVSC_WITHOUT_VERSION, True, "ALLOW"),
+        (_fixture("cross-service-dto-breaking.diff"), None, "REQUIRE_APPROVAL"),
         (_fixture("dynamic-mapper.diff"), None, "REQUIRE_APPROVAL"),
         (_fixture("cross-service-dto-breaking.diff"), True, "REQUIRE_APPROVAL"),
         (_fixture("dynamic-mapper.diff"), True, "REQUIRE_APPROVAL"),
@@ -138,9 +138,11 @@ def test_base_revision_change_changes_hash() -> None:
     ).base_revisions_sha256
 
 
-def test_multi_file_critical_violation_blocks_overall() -> None:
+def test_multi_file_shadow_violation_is_reported_without_blocking() -> None:
     diff = SQL_NON_TRANSACTIONAL + UNRELATED_MARKDOWN
-    assert _evaluate(diff).decision.value == "BLOCK"
+    result = _evaluate(diff)
+    assert result.decision.value == "ALLOW"
+    assert result.shadow_findings
 
 
 def test_unknown_boundary_preserves_owner_tests_and_evidence() -> None:

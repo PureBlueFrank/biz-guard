@@ -85,11 +85,23 @@ def export_metrics(records: list[dict[str, object]]) -> dict[str, object]:
     durations = [_as_float(record.get("duration_ms", 0.0)) for record in records]
     decisions = [str(record["decision"]) for record in records if record.get("decision") is not None]
     unknown_count = sum(1 for record in records if record.get("unknown") is True)
+    shadow_hit_count = sum(
+        int(value)
+        for record in records
+        if isinstance((value := record.get("shadow_findings", 0)), int)
+    )
+    shadow_hit_samples = sum(
+        1
+        for record in records
+        if isinstance((value := record.get("shadow_findings", 0)), int) and value > 0
+    )
     sample_count = len(records)
     return {
         "count": float(sample_count),
         "decision_distribution": {value: decisions.count(value) for value in sorted(set(decisions))},
         "unknown_rate": (unknown_count / sample_count) if sample_count else 0.0,
+        "shadow_hit_count": shadow_hit_count,
+        "shadow_hit_rate": (shadow_hit_samples / sample_count) if sample_count else 0.0,
         "duration_ms_p50": percentile(durations, 50.0),
         "duration_ms_p95": percentile(durations, 95.0),
         "sample_count": sample_count,

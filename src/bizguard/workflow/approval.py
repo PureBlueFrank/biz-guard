@@ -82,17 +82,13 @@ class ApprovalRequest(BaseModel):
 class ApprovalService:
     """Manage approval requests, persisting them and their audit events."""
 
-    def __init__(self, available: bool = True, store: ApprovalStore | None = None) -> None:
-        self.available = available
+    def __init__(self, store: ApprovalStore | None = None) -> None:
         self._store = store
         self._cache: dict[tuple[str, str, str, tuple[str, ...]], ApprovalRequest] = {}
         self.audit = AuditTrail()
 
     @_synchronized
     def create(self, request: ApprovalRequest) -> ApprovalRequest:
-        if not self.available:
-            self.audit.add("approval_unavailable", request.change_context_id)
-            return request
         if self._store is not None:
             persisted = self._store.get(
                 request.change_context_id, request.policy_revision, self._approver_set(request)

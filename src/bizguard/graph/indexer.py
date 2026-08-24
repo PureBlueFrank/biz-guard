@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 from hashlib import sha256
+from collections.abc import Mapping
 
 import yaml  # type: ignore[import-untyped]
 
@@ -42,7 +43,7 @@ def index(repos: Path, revision: str) -> GraphSnapshot:
         node(repository_id, NodeKind.ORGANIZATION, repo)
         node(service_id, NodeKind.DEPLOYMENT, repo)
         edge(repository_id, service_id, EdgeKind.DEPLOYED_WITH, f"repo://{repo}/pom.xml")
-        for path in repo_dir.rglob("*.java"):
+        for path in sorted(repo_dir.rglob("*.java")):
             for fact in analyze(path, repo, revision):
                 facts.append((repo, path, fact))
                 if fact.kind == "parameter":
@@ -53,11 +54,11 @@ def index(repos: Path, revision: str) -> GraphSnapshot:
                 kind = NodeKind.INTERFACE if fact.kind == "field" else NodeKind.CODE
                 node(fact.node_id, kind, fact.name)
                 edge(repository_id, fact.node_id, EdgeKind.DECLARES, fact.evidence_uri)
-        for contract in repo_dir.rglob("*.yaml"):
+        for contract in sorted(repo_dir.rglob("*.yaml")):
             for contract_fact in analyze_openapi(contract, repo, revision):
                 node(contract_fact.node_id, NodeKind.INTERFACE, contract_fact.name)
                 edge(service_id, contract_fact.node_id, EdgeKind.EXPOSES, contract_fact.evidence_uri, "IDL")
-        for contract in repo_dir.rglob("*.proto"):
+        for contract in sorted(repo_dir.rglob("*.proto")):
             for contract_fact in analyze_proto(contract, revision, repository=repo):
                 node(contract_fact.node_id, NodeKind.INTERFACE, contract_fact.name)
                 edge(
@@ -69,18 +70,47 @@ def index(repos: Path, revision: str) -> GraphSnapshot:
     _add_call_edges(facts, edge)
     _add_manual_edges(repos / "bizguard-manual-edges.yaml", nodes, node, edge)
     _add_business_nodes(nodes, node, edge)
-    digest = _content_digest(repos)
-    return GraphSnapshot(revision, _metadata() | {"content_digest": digest}, digest, list(nodes.values()), edges)
+    digest = content_digest(repos)
+    return GraphSnapshot(
+        revision,
+        _metadata() | {"content_digest": digest},
+        digest,
+        [nodes[key] for key in sorted(nodes)],
+        sorted(edges, key=lambda item: item.id),
+    )
 
 
-def _content_digest(repos: Path) -> str:
-    """Hash the complete indexed source tree, not the caller-supplied revision label."""
+def content_digest(
+    repos: Path,
+    *,
+    content_overrides: Mapping[str, bytes | None] | None = None,
+) -> str:
+    """Hash indexed inputs, optionally replacing paths with virtual diff content."""
     digest = sha256()
-    for path in sorted(item for item in repos.rglob("*") if item.is_file()):
-        relative = path.relative_to(repos).as_posix().encode("utf-8")
-        digest.update(len(relative).to_bytes(8, "big"))
-        digest.update(relative)
-        content = path.read_bytes()
+    repositories = sorted(item for item in repos.iterdir() if item.is_dir())
+    for repository in repositories:
+        name = repository.name.encode("utf-8")
+        digest.update(len(name).to_bytes(8, "big"))
+        digest.update(name)
+    indexed_files = {
+        path.relative_to(repos).as_posix(): path.read_bytes()
+        for repository in repositories
+        for pattern in ("*.java", "*.yaml", "*.proto")
+        for path in repository.rglob(pattern)
+        if path.is_file()
+    }
+    manual_edges = repos / "bizguard-manual-edges.yaml"
+    if manual_edges.is_file():
+        indexed_files[manual_edges.relative_to(repos).as_posix()] = manual_edges.read_bytes()
+    for relative, content in (content_overrides or {}).items():
+        if content is None:
+            indexed_files.pop(relative, None)
+        else:
+            indexed_files[relative] = content
+    for path, content in sorted(indexed_files.items()):
+        encoded_path = path.encode("utf-8")
+        digest.update(len(encoded_path).to_bytes(8, "big"))
+        digest.update(encoded_path)
         digest.update(len(content).to_bytes(8, "big"))
         digest.update(content)
     return digest.hexdigest()
