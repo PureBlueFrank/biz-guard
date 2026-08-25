@@ -1,6 +1,7 @@
 services:
   bizguard:
     build: .
+    image: bizguard:local
     restart: unless-stopped
     read_only: true
     user: bizguard
@@ -30,8 +31,8 @@ services:
       BIZGUARD_CALIBRATION_GATES_PATH: /etc/bizguard/calibration-gates.yaml
       BIZGUARD_CALIBRATION_PUBLIC_KEY_PATH: /etc/bizguard/calibration-public-key.pem
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     secrets:
       - bizguard_database_url
       - bizguard_zhipu_api_key
@@ -41,6 +42,25 @@ services:
       - bizguard-state:/var/lib/bizguard
     tmpfs:
       - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    image: bizguard:local
+    restart: "no"
+    read_only: true
+    user: bizguard
+    entrypoint: ["python", "-m", "bizguard.database"]
+    command: ["--database-url-file", "/run/secrets/bizguard_database_url"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    secrets:
+      - bizguard_database_url
+    tmpfs:
+      - /tmp:size=16m,mode=1777
     cap_drop:
       - ALL
     security_opt:

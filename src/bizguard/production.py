@@ -370,6 +370,7 @@ class ProductionSettings:
                 self.database_url,
                 min_pool_size=self.database_pool_min_size,
                 max_pool_size=self.database_pool_max_size,
+                initialize_schema=False,
             )
         if self.approval_db is None:
             raise ValueError("approval store is not configured")
@@ -384,6 +385,7 @@ class ProductionSettings:
                 self.database_url,
                 min_pool_size=self.database_pool_min_size,
                 max_pool_size=self.database_pool_max_size,
+                initialize_schema=False,
             )
         if self.context_db is None:
             raise ValueError("context store is not configured")

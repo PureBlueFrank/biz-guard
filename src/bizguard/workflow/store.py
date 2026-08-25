@@ -198,6 +198,7 @@ class PostgresApprovalStore:
         *,
         min_pool_size: int = 1,
         max_pool_size: int = 10,
+        initialize_schema: bool = True,
     ) -> None:
         try:
             from psycopg_pool import ConnectionPool
@@ -205,6 +206,10 @@ class PostgresApprovalStore:
             raise RuntimeError("PostgreSQL support requires the production dependency extra") from exc
         if min_pool_size < 0 or max_pool_size < max(1, min_pool_size):
             raise ValueError("invalid PostgreSQL pool size")
+        if initialize_schema:
+            from bizguard.database import migrate
+
+            migrate(database_url)
         self._pool = ConnectionPool(
             database_url,
             min_size=min_pool_size,
@@ -212,24 +217,6 @@ class PostgresApprovalStore:
             kwargs={"autocommit": True},
             open=True,
         )
-        with self._pool.connection() as connection, connection.transaction():
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS bizguard_approvals ("
-                " change_context_id TEXT NOT NULL,"
-                " policy_revision TEXT NOT NULL,"
-                " approver_set TEXT NOT NULL,"
-                " payload TEXT NOT NULL,"
-                " updated_at TIMESTAMPTZ NOT NULL,"
-                " PRIMARY KEY (change_context_id, policy_revision, approver_set)"
-                ")"
-            )
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS bizguard_approval_audit ("
-                " seq BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
-                " change_context_id TEXT NOT NULL,"
-                " payload TEXT NOT NULL"
-                ")"
-            )
 
     def get(self, change_context_id: str, policy_revision: str, approver_set: str) -> str | None:
         with self._pool.connection() as connection:
@@ -319,8 +306,11 @@ class PostgresApprovalStore:
 
     def ping(self) -> bool:
         with self._pool.connection() as connection:
-            row = connection.execute("SELECT 1").fetchone()
-        return bool(row and row[0] == 1)
+            row = connection.execute(
+                "SELECT to_regclass('bizguard_approvals') IS NOT NULL "
+                "AND to_regclass('bizguard_approval_audit') IS NOT NULL"
+            ).fetchone()
+        return bool(row and row[0])
 
     def close(self) -> None:
         self._pool.close()

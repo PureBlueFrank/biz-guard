@@ -44,6 +44,7 @@ jobs:
       - run: python -m ruff check --select D101,D103 src/bizguard agents_mcp
       - run: python -m mypy src tests agents_mcp
       - run: PYTHONHASHSEED=0 python -m pytest -q
+      - run: ./scripts/verify_production_compose.sh
   gate:
     needs: verify
     runs-on: ubuntu-latest

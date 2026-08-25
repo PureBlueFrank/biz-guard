@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
 from bizguard.change.store import PostgresChangeContextStore
+from bizguard.database import migrate
 from bizguard.workflow.approval import ApprovalRequest, ApprovalService
 from bizguard.workflow.state_machine import ApprovalState
 from bizguard.workflow.store import PostgresApprovalStore
@@ -15,6 +17,15 @@ from bizguard.workflow.store import PostgresApprovalStore
 
 DATABASE_URL = os.environ.get("BIZGUARD_TEST_POSTGRES_URL")
 pytestmark = pytest.mark.skipif(DATABASE_URL is None, reason="test PostgreSQL is unavailable")
+
+
+def test_postgres_migrations_are_idempotent_and_checksum_protected(tmp_path: Path) -> None:
+    assert DATABASE_URL is not None
+    migrate(DATABASE_URL)
+    assert migrate(DATABASE_URL) == []
+    (tmp_path / "001_initial.sql").write_text("SELECT 1;\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="checksum changed"):
+        migrate(DATABASE_URL, tmp_path)
 
 
 def test_postgres_context_store_is_immutable_across_instances() -> None:

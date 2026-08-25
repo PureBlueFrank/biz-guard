@@ -83,6 +83,8 @@ secrets/zhipu-api-key.txt         # 真实 API Key
 
 三个文件设为 `0600`；DSN 与 PostgreSQL 密码必须一致。生产更推荐使用托管 PostgreSQL 和编排平台的 secret provider，Compose 是可重现参考而非 HA 方案。
 
+生产建议为数据库迁移与运行服务分配不同身份：迁移身份拥有 BizGuard schema 的 DDL 权限，运行身份只拥有相关表的 `SELECT/INSERT/UPDATE` 和审计 identity sequence 的必需权限。Compose 参考为了本地可重现使用同一账号，不代表生产最小权限模型。
+
 ## 5. 启动与就绪验证
 
 ```bash
@@ -92,6 +94,14 @@ docker compose ps
 curl --fail http://127.0.0.1:8000/healthz
 curl --fail http://127.0.0.1:8000/readyz
 ```
+
+Compose 会先运行一次性 `migrate` 服务，迁移在 PostgreSQL advisory lock 保护的事务内执行，并把文件名与 SHA-256 记入 `bizguard_schema_migrations`。已应用迁移的内容被改写时会拒绝启动。非 Compose 部署必须在应用实例前显式执行：
+
+```bash
+python -m bizguard.database --database-url-file /run/secrets/bizguard_database_url
+```
+
+应用实例不会自动执行 DDL；迁移失败必须阻止发布。
 
 `/healthz` 只证明进程存活。`/readyz` 会同时探测审批存储和 Context Pack 存储，任一 PostgreSQL 检查失败都应让实例退出流量。MCP 请求必须携带适用于 issuer/audience 的 Bearer JWT；签名、scope 或时间声明不合格必须返回 401/403。
 
@@ -158,7 +168,7 @@ GitHub 仓库应将 `verify` 和 `gate` 设为 `main` 的必需检查，禁止�
 - [ ] 真实仓库只读挂载，catalog/contract/invariant 覆盖抽样验收通过。
 - [ ] 真实 OIDC JWT 正常通过，错误 issuer/audience/scope、过期 token 和未知 `kid` 均被拒绝。
 - [ ] 至少两个服务实例并发审批验证通过，不丢失会签、状态或审计事件。
-- [ ] PostgreSQL 备份、PITR/恢复演练、连接池与容量告警通过。
+- [ ] PostgreSQL 迁移校验和最小权限验收通过；备份、PITR/恢复演练、连接池与容量告警通过。
 - [ ] `doctor --production` 在上线网络中全部为 `ok`，真实 Embedding 召回集达到组织阈值。
 - [ ] 每个启用 Policy 都有真实签名样本和 Owner 批准；blocking Policy 另有回退演练。
 - [ ] GitHub `verify`/`gate` 已设为必需检查，PR、main push 和手动重放均留存证据。
@@ -172,4 +182,5 @@ python -m ruff check --select D101,D103 src/bizguard agents_mcp
 python -m mypy src tests agents_mcp
 python -m pytest -q
 ./scripts/verify_install.sh --offline
+./scripts/verify_production_compose.sh
 ```

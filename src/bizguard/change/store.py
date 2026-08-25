@@ -94,6 +94,7 @@ class PostgresChangeContextStore:
         *,
         min_pool_size: int = 1,
         max_pool_size: int = 10,
+        initialize_schema: bool = True,
     ) -> None:
         try:
             from psycopg_pool import ConnectionPool
@@ -101,6 +102,10 @@ class PostgresChangeContextStore:
             raise RuntimeError("PostgreSQL support requires the production dependency extra") from exc
         if min_pool_size < 0 or max_pool_size < max(1, min_pool_size):
             raise ValueError("invalid PostgreSQL pool size")
+        if initialize_schema:
+            from bizguard.database import migrate
+
+            migrate(database_url)
         self._pool = ConnectionPool(
             database_url,
             min_size=min_pool_size,
@@ -108,14 +113,6 @@ class PostgresChangeContextStore:
             kwargs={"autocommit": True},
             open=True,
         )
-        with self._pool.connection() as connection, connection.transaction():
-            connection.execute(
-                "CREATE TABLE IF NOT EXISTS bizguard_change_context ("
-                " id TEXT PRIMARY KEY,"
-                " payload TEXT NOT NULL,"
-                " created_at TIMESTAMPTZ NOT NULL"
-                ")"
-            )
 
     def put(self, context_id: str, payload: str, created_at: str) -> None:
         with self._pool.connection() as connection, connection.transaction():
@@ -141,8 +138,10 @@ class PostgresChangeContextStore:
 
     def ping(self) -> bool:
         with self._pool.connection() as connection:
-            row = connection.execute("SELECT 1").fetchone()
-        return bool(row and row[0] == 1)
+            row = connection.execute(
+                "SELECT to_regclass('bizguard_change_context') IS NOT NULL"
+            ).fetchone()
+        return bool(row and row[0])
 
     def close(self) -> None:
         self._pool.close()
