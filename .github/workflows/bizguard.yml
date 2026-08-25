@@ -75,9 +75,16 @@ jobs:
           fi
           git fetch origin "$base" --depth=1
           printf 'sha=%s\n' "$base" >> "$GITHUB_OUTPUT"
-      - name: Generate change diff and base revisions
+      - name: Generate governed change diff and base revisions
+        id: governed
         run: |
-          git diff "${{ steps.base.outputs.sha }}" HEAD > /tmp/pr.diff
+          if git diff --quiet "${{ steps.base.outputs.sha }}" HEAD -- fixtures/java-microservices sample; then
+            printf 'changed=false\n' >> "$GITHUB_OUTPUT"
+            : > /tmp/pr.diff
+          else
+            printf 'changed=true\n' >> "$GITHUB_OUTPUT"
+            git diff "${{ steps.base.outputs.sha }}" HEAD -- fixtures/java-microservices sample > /tmp/pr.diff
+          fi
           printf 'revision: %s\n' "${{ steps.base.outputs.sha }}" > /tmp/base-revisions.yaml
       - name: Install trusted BizGuard engine from base revision
         run: |
@@ -91,30 +98,15 @@ jobs:
             "$RUNNER_TEMP/bizguard-trusted[production]"
       - name: Policy promotion governance gate
         run: |
-          trusted_python="$RUNNER_TEMP/bizguard-venv/bin/python"
           trusted_root="$RUNNER_TEMP/bizguard-trusted"
-          if "$trusted_python" -c 'import bizguard.policy.governance_gate' 2>/dev/null; then
-            runner="$trusted_python"
-            gates="$trusted_root/policy/calibration-gates.yaml"
-            public_key="$trusted_root/policy/calibration-public-key.pem"
-          else
-            python -m venv "$RUNNER_TEMP/bizguard-current-venv"
-            runner="$RUNNER_TEMP/bizguard-current-venv/bin/python"
-            "$RUNNER_TEMP/bizguard-current-venv/bin/pip" install \
-              --prefer-binary \
-              --only-binary=tree-sitter,tree-sitter-java \
-              --constraint requirements-production.lock \
-              '.[production]'
-            gates="policy/calibration-gates.yaml"
-            public_key="policy/calibration-public-key.pem"
-          fi
-          "$runner" -m bizguard.policy.governance_gate \
+          "$RUNNER_TEMP/bizguard-venv/bin/python" -m bizguard.policy.governance_gate \
             --base-registry "$trusted_root/policy/phase5-registry.yaml" \
             --current-registry policy/phase5-registry.yaml \
-            --gates "$gates" \
-            --public-key "$public_key" \
+            --gates "$trusted_root/policy/calibration-gates.yaml" \
+            --public-key "$trusted_root/policy/calibration-public-key.pem" \
             --bundle-directory policy/calibration
       - name: BizGuard safety gate
+        if: steps.governed.outputs.changed == 'true'
         id: gate
         env:
           BIZGUARD_CATALOG_PATH: ${{ runner.temp }}/bizguard-trusted/src/bizguard/semantic/catalog.yaml
@@ -152,8 +144,17 @@ jobs:
           PY
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$code"
+      - name: Record non-business change decision
+        if: steps.governed.outputs.changed != 'true'
+        run: |
+          {
+            echo "## BizGuard decision"
+            echo "- decision: not applicable"
+            echo "- rationale: no changes under the governed fixture or sample repository paths"
+            echo "- platform verification: verify job and policy promotion governance gate"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload BizGuard evidence
-        if: always()
+        if: always() && steps.governed.outputs.changed == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: bizguard-gate-evidence

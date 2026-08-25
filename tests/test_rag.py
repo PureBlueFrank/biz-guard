@@ -12,6 +12,7 @@ from bizguard.diff_parser import ParsedDiff, ParsedFile
 from bizguard.rag.embedding import (
     CACHE_VERSION,
     EMBEDDING_MODEL,
+    EmbeddingError,
     ZhipuEmbeddingClient,
     load_zhipu_api_key,
 )
@@ -133,6 +134,35 @@ def test_embedding_client_batches_requests_at_provider_limit(
     vectors = client.embed([f"text-{index}" for index in range(65)])
     assert batch_sizes == [64, 1]
     assert len(vectors) == 65
+
+
+def test_embedding_client_rejects_duplicate_provider_indexes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = ZhipuEmbeddingClient("test-key", tmp_path, dimensions=256)
+    response = httpx.Response(
+        200,
+        json={
+            "data": [
+                {"index": 0, "embedding": [1.0] * 256},
+                {"index": 0, "embedding": [2.0] * 256},
+            ]
+        },
+        request=httpx.Request("POST", "https://embedding.test"),
+    )
+    monkeypatch.setattr(client, "_post", lambda _texts: response)
+    with pytest.raises(EmbeddingError, match="indexes"):
+        client.embed(["first", "second"])
+
+
+def test_embedding_client_reports_corrupt_cache_without_leaking_contents(tmp_path: Path) -> None:
+    client = ZhipuEmbeddingClient("test-key", tmp_path, dimensions=256)
+    cache_path = client._cache_path(["sensitive governed text"])
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text("not-json", encoding="utf-8")
+    with pytest.raises(EmbeddingError, match="unreadable or invalid") as error:
+        client.embed(["sensitive governed text"])
+    assert "sensitive governed text" not in str(error.value)
 
 
 def test_zhipu_embedding_live_call_when_local_credentials_are_available() -> None:

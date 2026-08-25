@@ -110,18 +110,30 @@ class ZhipuEmbeddingClient:
         if response is None:  # pragma: no cover - retry loop either returns or raises
             raise RuntimeError("embedding request produced no response")
         response.raise_for_status()
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise EmbeddingError("Zhipu embedding response is not valid JSON") from exc
         records = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(records, list) or len(records) != len(texts):
             raise EmbeddingError("Zhipu embedding response has unexpected data length")
-        if all(isinstance(record, dict) and isinstance(record.get("index"), int) for record in records):
-            records = sorted(records, key=lambda record: int(record["index"]))
+        if not all(
+            isinstance(record, dict) and isinstance(record.get("index"), int)
+            for record in records
+        ):
+            raise EmbeddingError("Zhipu embedding response contains no vector indexes")
+        records = sorted(records, key=lambda record: int(record["index"]))
+        if [record["index"] for record in records] != list(range(len(texts))):
+            raise EmbeddingError("Zhipu embedding response contains invalid vector indexes")
         normalized: list[list[float]] = []
         for record in records:
             vector = record.get("embedding") if isinstance(record, dict) else None
             if not isinstance(vector, list):
                 raise EmbeddingError("Zhipu embedding response contains no vectors")
-            normalized.append([float(value) for value in vector])
+            try:
+                normalized.append([float(value) for value in vector])
+            except (TypeError, ValueError) as exc:
+                raise EmbeddingError("Zhipu embedding response contains invalid vectors") from exc
         if any(
             len(vector) != self._dimensions or not all(math.isfinite(value) for value in vector)
             for vector in normalized
@@ -154,7 +166,10 @@ class ZhipuEmbeddingClient:
         return self._cache_dir / f"{fingerprint}.json"
 
     def _load_cache(self, path: Path, texts: list[str]) -> list[list[float]]:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise EmbeddingError("embedding cache is unreadable or invalid") from exc
         if (
             payload.get("cache_version") != self.cache_version
             or payload.get("dimensions") != self._dimensions
@@ -163,7 +178,10 @@ class ZhipuEmbeddingClient:
             or not isinstance(payload.get("vectors"), list)
         ):
             raise EmbeddingError(f"embedding cache validation failed: {path}")
-        vectors = [[float(value) for value in vector] for vector in payload["vectors"]]
+        try:
+            vectors = [[float(value) for value in vector] for vector in payload["vectors"]]
+        except (TypeError, ValueError) as exc:
+            raise EmbeddingError("embedding cache contains invalid vectors") from exc
         if any(
             len(vector) != self._dimensions or not all(math.isfinite(value) for value in vector)
             for vector in vectors

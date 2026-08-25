@@ -141,6 +141,8 @@ Runner 先计算 `required_tests`，再不经 shell 执行 catalog 命令，为�
 
 GitHub 仓库应将 `verify` 和 `gate` 设为 `main` 的必需检查，禁止绕过。工作流需在 pull request、main push 和手动重放三种事件上成功。发布前保留 `/tmp/bizguard-result.json`、审计日志和测试证据制品。
 
+仓库自身的参考工作流只将 `fixtures/java-microservices` 和 `sample` 视为受 Demo catalog 管理的业务路径；平台源码由 `verify` 和 Policy registry 签名治理门禁检查。接入组织仓库时必须把该路径列表替换为 catalog 中真实受管仓库，不得因沿用 Demo 路径而跳过业务变更。
+
 ## 8. 扩容、备份与回退
 
 - 所有实例指向同一 PostgreSQL 主库；不挂载共享 SQLite 卷。
