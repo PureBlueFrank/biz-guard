@@ -8,7 +8,21 @@ from bizguard.eval.retrieval import evaluate
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest, SearchResult
 from bizguard.knowledge.repository import KnowledgeRepository
-from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
+from bizguard.knowledge.search import EmbeddingVectorAdapter, HybridSearch, LocalVectorAdapter
+
+
+class RecordingEmbedder:
+    """Record provider inputs while returning deterministic real-vector scores."""
+
+    model = "embedding-3"
+    cache_version = "test-real-v1"
+
+    def __init__(self) -> None:
+        self.inputs: list[str] = []
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        self.inputs.extend(texts)
+        return [[1.0, float(index + 1)] for index, _ in enumerate(texts)]
 
 
 def test_memory_repository_can_be_reused_across_worker_threads() -> None:
@@ -142,3 +156,23 @@ def test_search_reports_embedding_evidence_and_lexical_degradation(search: Hybri
         "embedding-3",
         "offline-hash-v1",
     )
+
+
+def test_real_embedding_receives_only_acl_and_freshness_eligible_documents() -> None:
+    repository = KnowledgeRepository.memory()
+    ingest_directory(Path(__file__).parents[1] / "knowledge/published", repository)
+    embedder = RecordingEmbedder()
+    try:
+        result = HybridSearch(repository, EmbeddingVectorAdapter(embedder)).search(
+            SearchRequest(
+                query="incident ledger",
+                caller_roles=["engineering"],
+                scope="coupon_redemption",
+                revision="semantic-seed-v1",
+            )
+        )
+    finally:
+        repository.close()
+    assert result.semantic_channel == "REAL: zhipu embedding-3"
+    assert not any("Restricted production incident" in text for text in embedder.inputs)
+    assert not any("Legacy ledger status" in text for text in embedder.inputs)

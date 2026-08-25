@@ -1,0 +1,22 @@
+policies:
+  redeem-ledger-consistency:
+    min_samples: 30
+    min_positive_samples: 10
+    min_negative_samples: 10
+    max_false_positive_rate: 0.02
+    max_false_negative_rate: 0.0
+    max_unknown_rate: 0.05
+  published-dto-backward-compatible:
+    min_samples: 30
+    min_positive_samples: 10
+    min_negative_samples: 10
+    max_false_positive_rate: 0.02
+    max_false_negative_rate: 0.0
+    max_unknown_rate: 0.05
+  coupon-write-consumes-idempotency-key:
+    min_samples: 30
+    min_positive_samples: 10
+    min_negative_samples: 10
+    max_false_positive_rate: 0.02
+    max_false_negative_rate: 0.0
+    max_unknown_rate: 0.05

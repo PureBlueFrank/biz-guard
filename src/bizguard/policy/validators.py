@@ -18,6 +18,7 @@ def validate_artifact(
     severity: str = "high",
     *,
     baseline_source: str | None = None,
+    validator: str | None = None,
 ) -> dict[str, object]:
     """Validate non-Python public artifacts from their content, never their filename.
 
@@ -32,7 +33,8 @@ def validate_artifact(
     message = "artifact is compatible"
     baseline_lower = baseline_source.lower() if baseline_source is not None else ""
     api_markers = ("openapi", "swagger", "paths:", "components:", "definitions:")
-    if suffix in {".yaml", ".yml", ".json"} and any(
+    selected = validator or _validator_for_suffix(suffix)
+    if selected == "proto_openapi" and suffix in {".yaml", ".yml", ".json"} and any(
         marker in lower or marker in baseline_lower for marker in api_markers
     ):
         violated = _openapi_has_missing_required_field(source) or (
@@ -40,7 +42,9 @@ def validate_artifact(
             and _openapi_removed_fields(baseline_source, source)
         )
         message = "published OpenAPI field removed" if violated else message
-    elif suffix == ".proto":
+    elif selected == "proto_openapi" and suffix in {".yaml", ".yml", ".json"}:
+        pass
+    elif selected == "proto_openapi" and suffix == ".proto":
         current_fields = _proto_fields(source)
         if baseline_source is not None:
             baseline_fields = _proto_fields(baseline_source)
@@ -48,15 +52,17 @@ def validate_artifact(
         else:
             violated = bool("message" in lower and not any(name in {"id", "status"} for _, name in current_fields))
         message = "published Proto required field missing" if violated else message
-    elif suffix == ".sql":
+    elif selected == "sql_transaction" and suffix == ".sql":
         violated = _sql_has_untransactional_write(source)
         message = "migration write is not transactional" if violated else message
-    elif suffix in {".avsc", ".schema"}:
+    elif selected == "schema_version" and suffix in {".avsc", ".schema"}:
         violated = "schema_version" not in lower and "version" not in lower
         message = "message schema has no version" if violated else message
-    elif suffix in {".properties", ".conf", ".env"}:
+    elif selected == "no_literal_credentials" and suffix in {".properties", ".conf", ".env"}:
         violated = bool(re.search(r"(?i)(password|secret|token|api[_-]?key)\s*=\s*[^${\s][^\s]*", source))
         message = "configuration contains a literal credential" if violated else message
+    elif validator is not None:
+        raise ValueError(f"validator {validator} does not support artifact: {path}")
     return {
         "id": policy_id,
         "severity": severity,
@@ -67,6 +73,18 @@ def validate_artifact(
         "precision": "high" if suffix in {".yaml", ".yml", ".json"} else "medium",
         "evidence": [path],
     }
+
+
+def _validator_for_suffix(suffix: str) -> str | None:
+    if suffix in {".proto", ".yaml", ".yml", ".json"}:
+        return "proto_openapi"
+    if suffix == ".sql":
+        return "sql_transaction"
+    if suffix in {".avsc", ".schema"}:
+        return "schema_version"
+    if suffix in {".properties", ".conf", ".env"}:
+        return "no_literal_credentials"
+    return None
 
 
 def _proto_fields(source: str) -> dict[tuple[str, str], int]:

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import wraps
+from copy import deepcopy
 from threading import RLock
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
-from bizguard.observability import AuditTrail
+from bizguard.observability import AuditEvent, AuditTrail
 from .state_machine import ApprovalState, transition
 from .store import ApprovalStore
 
@@ -90,13 +91,41 @@ class ApprovalService:
     @_synchronized
     def create(self, request: ApprovalRequest) -> ApprovalRequest:
         if self._store is not None:
-            persisted = self._store.get(
-                request.change_context_id, request.policy_revision, self._approver_set(request)
+            committed_events: list[AuditEvent] = []
+
+            def operation(persisted: str | None) -> tuple[str, str, list[str]]:
+                if persisted is not None:
+                    restored = ApprovalRequest.model_validate_json(persisted)
+                    updated_at = restored.updated_at or restored.created_at or datetime.now(timezone.utc)
+                    return persisted, updated_at.isoformat(), []
+                current = request.model_copy(deep=True)
+                now = datetime.now(timezone.utc)
+                current.created_at = current.created_at or now
+                current.updated_at = now
+                committed_events.append(
+                    self._event(
+                        "approval_created",
+                        current,
+                        policy_revision=current.policy_revision,
+                        requested_by=current.requested_by,
+                    )
+                )
+                return (
+                    current.model_dump_json(),
+                    now.isoformat(),
+                    [event.json_line() for event in committed_events],
+                )
+
+            payload = self._store.mutate(
+                request.change_context_id,
+                request.policy_revision,
+                self._approver_set(request),
+                operation,
             )
-            if persisted is not None:
-                restored = ApprovalRequest.model_validate_json(persisted)
-                self._cache[restored.key] = restored
-                return restored
+            restored = ApprovalRequest.model_validate_json(payload)
+            self.audit.events.extend(committed_events)
+            self._cache[restored.key] = restored
+            return restored
         existing = self._cache.get(request.key)
         if existing is not None:
             return existing
@@ -105,90 +134,140 @@ class ApprovalService:
             request.created_at = now
         request.updated_at = now
         self._cache[request.key] = request
-        self._persist(request)
-        self._record(
-            "approval_created",
-            request,
-            policy_revision=request.policy_revision,
-            requested_by=request.requested_by,
+        self.audit.events.append(
+            self._event(
+                "approval_created",
+                request,
+                policy_revision=request.policy_revision,
+                requested_by=request.requested_by,
+            )
         )
         return request
 
     @_synchronized
     def delegate(self, request: ApprovalRequest, approver: str, delegate: str) -> None:
-        if approver not in request.approvers:
-            raise ValueError("only configured approvers may delegate")
-        request.delegates[approver] = delegate
-        self._record("approval_delegated", request, approver=approver, delegate=delegate)
-        self._persist(request)
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            if approver not in current.approvers:
+                raise ValueError("only configured approvers may delegate")
+            current.delegates[approver] = delegate
+            return [self._event("approval_delegated", current, approver=approver, delegate=delegate)]
+
+        self._mutate(request, operation)
 
     @_synchronized
     def add_evidence(self, request: ApprovalRequest, evidence: str) -> None:
-        request.state = transition(request.state, ApprovalState.PENDING)
-        request.evidence_refs.append(evidence)
-        self._record("evidence_added", request, evidence=evidence)
-        self._persist(request)
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            current.state = transition(current.state, ApprovalState.PENDING)
+            current.evidence_refs.append(evidence)
+            return [self._event("evidence_added", current, evidence=evidence)]
+
+        self._mutate(request, operation)
 
     @_synchronized
     def request_evidence(self, request: ApprovalRequest, reason: str) -> None:
-        request.state = transition(request.state, ApprovalState.EVIDENCE_REQUESTED)
-        self._record("evidence_requested", request, reason=reason)
-        self._persist(request)
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            current.state = transition(current.state, ApprovalState.EVIDENCE_REQUESTED)
+            return [self._event("evidence_requested", current, reason=reason)]
+
+        self._mutate(request, operation)
 
     @_synchronized
     def approve(self, request: ApprovalRequest, actor: str) -> None:
-        eligible = set(request.approvers) | set(request.delegates.values())
-        if actor not in eligible:
-            raise ValueError("actor is not an approver or delegate")
-        approval_slot = next(
-            (approver for approver, delegate in request.delegates.items() if delegate == actor),
-            actor,
-        )
-        request.approvals.add(approval_slot)
-        self._record("approval_recorded", request, actor=actor)
-        if len(request.approvals) >= request.required_cosigns:
-            request.state = transition(request.state, ApprovalState.APPROVED)
-            self._record("approval_granted", request)
-        self._persist(request)
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            eligible = set(current.approvers) | set(current.delegates.values())
+            if actor not in eligible:
+                raise ValueError("actor is not an approver or delegate")
+            approval_slot = next(
+                (
+                    approver
+                    for approver, delegate in current.delegates.items()
+                    if delegate == actor
+                ),
+                actor,
+            )
+            current.approvals.add(approval_slot)
+            events = [self._event("approval_recorded", current, actor=actor)]
+            if len(current.approvals) >= current.required_cosigns:
+                current.state = transition(current.state, ApprovalState.APPROVED)
+                events.append(self._event("approval_granted", current))
+            return events
+
+        self._mutate(request, operation)
 
     @_synchronized
     def reject(self, request: ApprovalRequest, actor: str, reason: str) -> None:
-        if actor not in set(request.approvers) | set(request.delegates.values()):
-            raise ValueError("actor is not an approver or delegate")
-        request.state = transition(request.state, ApprovalState.REJECTED)
-        self._record("approval_rejected", request, actor=actor, reason=reason)
-        self._persist(request)
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            if actor not in set(current.approvers) | set(current.delegates.values()):
+                raise ValueError("actor is not an approver or delegate")
+            current.state = transition(current.state, ApprovalState.REJECTED)
+            return [self._event("approval_rejected", current, actor=actor, reason=reason)]
+
+        self._mutate(request, operation)
 
     @_synchronized
     def grant_waiver(self, request: ApprovalRequest, waiver: Waiver) -> None:
         if not waiver.scope or not waiver.reason or not waiver.compensating_control:
             raise ValueError("waiver requires scope, reason, and compensating control")
-        request.waiver = waiver
-        self._record("waiver_granted", request, scope=waiver.scope)
-        self._persist(request)
+
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            current.waiver = waiver
+            return [self._event("waiver_granted", current, scope=waiver.scope)]
+
+        self._mutate(request, operation)
 
     @_synchronized
     def expire_or_escalate(self, request: ApprovalRequest, deadline: datetime, now: datetime | None = None) -> None:
-        if (now or datetime.now(timezone.utc)) >= deadline and request.state in {ApprovalState.PENDING, ApprovalState.EVIDENCE_REQUESTED}:
-            request.state = transition(request.state, ApprovalState.ESCALATED)
-            self._record("approval_escalated", request)
-            self._persist(request)
+        def operation(current: ApprovalRequest) -> list[AuditEvent]:
+            if (now or datetime.now(timezone.utc)) < deadline or current.state not in {
+                ApprovalState.PENDING,
+                ApprovalState.EVIDENCE_REQUESTED,
+            }:
+                return []
+            current.state = transition(current.state, ApprovalState.ESCALATED)
+            return [self._event("approval_escalated", current)]
+
+        self._mutate(request, operation)
 
     def _approver_set(self, request: ApprovalRequest) -> str:
         return f"{','.join(sorted(request.approvers))}@{request.decision_fingerprint}"
 
-    def _persist(self, request: ApprovalRequest) -> None:
-        request.updated_at = datetime.now(timezone.utc)
-        if self._store is not None:
-            self._store.put(
-                request.change_context_id,
-                request.policy_revision,
-                self._approver_set(request),
-                request.model_dump_json(),
-                request.updated_at.isoformat(),
+    def _mutate(
+        self,
+        request: ApprovalRequest,
+        operation: Callable[[ApprovalRequest], list[AuditEvent]],
+    ) -> None:
+        committed_events: list[AuditEvent] = []
+        if self._store is None:
+            committed_events.extend(operation(request))
+            request.updated_at = datetime.now(timezone.utc)
+            self.audit.events.extend(committed_events)
+            self._cache[request.key] = request
+            return
+
+        def persisted_operation(payload: str | None) -> tuple[str, str, list[str]]:
+            if payload is None:
+                raise ValueError("approval request unavailable")
+            current = ApprovalRequest.model_validate_json(payload)
+            committed_events.extend(operation(current))
+            current.updated_at = datetime.now(timezone.utc)
+            return (
+                current.model_dump_json(),
+                current.updated_at.isoformat(),
+                [event.json_line() for event in committed_events],
             )
 
-    def _record(self, action: str, request: ApprovalRequest, **details: str) -> None:
-        event = self.audit.add(action, request.change_context_id, **details)
-        if self._store is not None:
-            self._store.append_event(request.change_context_id, event.json_line())
+        payload = self._store.mutate(
+            request.change_context_id,
+            request.policy_revision,
+            self._approver_set(request),
+            persisted_operation,
+        )
+        restored = ApprovalRequest.model_validate_json(payload)
+        for field_name in ApprovalRequest.model_fields:
+            setattr(request, field_name, deepcopy(getattr(restored, field_name)))
+        self.audit.events.extend(committed_events)
+        self._cache[request.key] = request
+
+    def _event(self, action: str, request: ApprovalRequest, **details: str) -> AuditEvent:
+        temporary = AuditTrail()
+        return temporary.add(action, request.change_context_id, **details)

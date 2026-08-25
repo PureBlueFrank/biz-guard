@@ -96,9 +96,10 @@ def test_embedding_client_reuses_valid_cache_without_network(
         json.dumps(
             {
                 "cache_version": CACHE_VERSION,
+                "dimensions": 2048,
                 "model": EMBEDDING_MODEL,
                 "texts": texts,
-                "vectors": [[1, 2]],
+                "vectors": [[1] * 2048],
             }
         ),
         encoding="utf-8",
@@ -106,7 +107,32 @@ def test_embedding_client_reuses_valid_cache_without_network(
     monkeypatch.setattr(
         "bizguard.rag.embedding.httpx.post", lambda *args, **kwargs: pytest.fail("network used")
     )
-    assert client.embed(texts) == [[1.0, 2.0]]
+    assert client.embed(texts) == [[1.0] * 2048]
+
+
+def test_embedding_client_batches_requests_at_provider_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = ZhipuEmbeddingClient("test-key", tmp_path, dimensions=256)
+    batch_sizes: list[int] = []
+
+    def fake_post(texts: list[str]) -> httpx.Response:
+        batch_sizes.append(len(texts))
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"index": index, "embedding": [float(index + 1)] * 256}
+                    for index in range(len(texts))
+                ]
+            },
+            request=httpx.Request("POST", "https://embedding.test"),
+        )
+
+    monkeypatch.setattr(client, "_post", fake_post)
+    vectors = client.embed([f"text-{index}" for index in range(65)])
+    assert batch_sizes == [64, 1]
+    assert len(vectors) == 65
 
 
 def test_zhipu_embedding_live_call_when_local_credentials_are_available() -> None:

@@ -11,6 +11,7 @@ capabilities:
     name: Coupon redemption aggregate
     owner: coupon_platform
     repositories: [coupon-core, merchant-service, coupon-contract]
+    graph: true
 owners:
   - id: coupon_platform
     name: Coupon Platform

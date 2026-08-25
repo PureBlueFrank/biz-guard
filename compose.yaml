@@ -7,19 +7,34 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      BIZGUARD_API_TOKEN: "${BIZGUARD_API_TOKEN:?set BIZGUARD_API_TOKEN}"
       BIZGUARD_ALLOWED_HOSTS: "${BIZGUARD_ALLOWED_HOSTS:?set BIZGUARD_ALLOWED_HOSTS}"
       BIZGUARD_ALLOWED_ORIGINS: "${BIZGUARD_ALLOWED_ORIGINS:-}"
+      BIZGUARD_AUTH_MODE: oidc
       BIZGUARD_AUTH_ISSUER_URL: "${BIZGUARD_AUTH_ISSUER_URL:?set BIZGUARD_AUTH_ISSUER_URL}"
+      BIZGUARD_AUTH_JWKS_URL: "${BIZGUARD_AUTH_JWKS_URL:?set BIZGUARD_AUTH_JWKS_URL}"
+      BIZGUARD_AUTH_AUDIENCE: "${BIZGUARD_AUTH_AUDIENCE:?set BIZGUARD_AUTH_AUDIENCE}"
+      BIZGUARD_REQUIRED_SCOPES: "${BIZGUARD_REQUIRED_SCOPES:-bizguard:use}"
       BIZGUARD_RESOURCE_URL: "${BIZGUARD_RESOURCE_URL:?set BIZGUARD_RESOURCE_URL}"
       BIZGUARD_CALLER_IDENTITY: "${BIZGUARD_CALLER_IDENTITY:?set BIZGUARD_CALLER_IDENTITY}"
       BIZGUARD_CALLER_ROLES: "${BIZGUARD_CALLER_ROLES:?set BIZGUARD_CALLER_ROLES}"
+      BIZGUARD_DATABASE_URL_FILE: /run/secrets/bizguard_database_url
+      BIZGUARD_EMBEDDING_PROVIDER: zhipu
+      BIZGUARD_ZHIPU_API_KEY_FILE: /run/secrets/bizguard_zhipu_api_key
+      BIZGUARD_EMBEDDING_CACHE_DIR: /var/lib/bizguard/embeddings
       BIZGUARD_CATALOG_PATH: /etc/bizguard/catalog.yaml
       BIZGUARD_POLICY_REGISTRY_PATH: /etc/bizguard/policy-registry.yaml
       BIZGUARD_CONTRACT_REGISTRY_PATH: /etc/bizguard/contracts.yaml
       BIZGUARD_INVARIANTS_PATH: /etc/bizguard/invariants.yaml
       BIZGUARD_KNOWLEDGE_ROOT: /etc/bizguard/knowledge/published
       BIZGUARD_INVARIANT_KNOWLEDGE_ROOT: /etc/bizguard/knowledge/invariants
+      BIZGUARD_CALIBRATION_GATES_PATH: /etc/bizguard/calibration-gates.yaml
+      BIZGUARD_CALIBRATION_PUBLIC_KEY_PATH: /etc/bizguard/calibration-public-key.pem
+    depends_on:
+      postgres:
+        condition: service_healthy
+    secrets:
+      - bizguard_database_url
+      - bizguard_zhipu_api_key
     volumes:
       - "${BIZGUARD_REPOSITORY_PATH:?set BIZGUARD_REPOSITORY_PATH}:/workspace/repos:ro"
       - "${BIZGUARD_GOVERNANCE_PATH:?set BIZGUARD_GOVERNANCE_PATH}:/etc/bizguard:ro"
@@ -31,5 +46,33 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  postgres:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bizguard
+      POSTGRES_USER: bizguard
+      POSTGRES_PASSWORD_FILE: /run/secrets/bizguard_database_password
+    secrets:
+      - bizguard_database_password
+    volumes:
+      - postgres-state:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bizguard -d bizguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   bizguard-state:
+  postgres-state:
+
+secrets:
+  bizguard_database_url:
+    file: "${BIZGUARD_DATABASE_URL_FILE:?set BIZGUARD_DATABASE_URL_FILE}"
+  bizguard_database_password:
+    file: "${BIZGUARD_DATABASE_PASSWORD_FILE:?set BIZGUARD_DATABASE_PASSWORD_FILE}"
+  bizguard_zhipu_api_key:
+    file: "${BIZGUARD_ZHIPU_API_KEY_FILE:?set BIZGUARD_ZHIPU_API_KEY_FILE}"

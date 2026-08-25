@@ -24,6 +24,11 @@ dev = [
   "ruff",
   "mypy",
 ]
+production = [
+  "cryptography>=50.0.0,<51",
+  "psycopg[binary]>=3.3.4,<4",
+  "psycopg-pool>=3.3.1,<4",
+]
 
 [project.scripts]
 bizguard = "bizguard.cli:main"

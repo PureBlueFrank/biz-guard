@@ -13,6 +13,7 @@ from bizguard.bench.verify import verify
 from bizguard.change.store import ChangeContextStore
 from bizguard.context.compiler import ContextCompiler, ContextLayer
 from bizguard.graph.models import GraphSnapshot
+from bizguard.semantic.models import SemanticCatalog
 
 
 ROOT = Path(__file__).parent.parent
@@ -108,10 +109,12 @@ def test_reused_compiler_indexes_one_revision_once(monkeypatch: pytest.MonkeyPat
 
     calls = 0
 
-    def counting_index(root: Path, revision: str) -> GraphSnapshot:
+    def counting_index(
+        root: Path, revision: str, catalog: SemanticCatalog | None = None
+    ) -> GraphSnapshot:
         nonlocal calls
         calls += 1
-        return real_index(root, revision)
+        return real_index(root, revision, catalog)
 
     monkeypatch.setattr("bizguard.context.compiler.index", counting_index)
     compiler = ContextCompiler(ROOT / "fixtures/java-microservices", reuse_index=True)
@@ -130,10 +133,12 @@ def test_reused_compiler_reindexes_when_content_changes(
     shutil.copytree(ROOT / "fixtures/java-microservices", fixtures)
     calls = 0
 
-    def counting_index(root: Path, revision: str) -> GraphSnapshot:
+    def counting_index(
+        root: Path, revision: str, catalog: SemanticCatalog | None = None
+    ) -> GraphSnapshot:
         nonlocal calls
         calls += 1
-        return real_index(root, revision)
+        return real_index(root, revision, catalog)
 
     monkeypatch.setattr("bizguard.context.compiler.index", counting_index)
     compiler = ContextCompiler(fixtures, reuse_index=True)

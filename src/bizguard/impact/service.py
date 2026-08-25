@@ -43,7 +43,7 @@ class ImpactService:
         self,
         changed_symbol: str,
         revision: str,
-        capability: str | None = "coupon_redemption",
+        capability: str | None = None,
         diff_text: str | None = None,
         snapshot: GraphSnapshot | None = None,
     ) -> ImpactReport:
@@ -52,7 +52,7 @@ class ImpactService:
             with self._snapshot_lock:
                 snapshot = self._snapshots.get(revision)
                 if snapshot is None or snapshot.content_digest != digest:
-                    snapshot = index(self._root, revision)
+                    snapshot = index(self._root, revision, self._catalog)
                     self._snapshots[revision] = snapshot
         result = analyze(snapshot, changed_symbol, revision)
         capability = capability or self._infer_capability(changed_symbol, diff_text)

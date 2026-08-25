@@ -22,6 +22,7 @@ class Capability(BaseModel):
     name: str
     owner: str
     repositories: list[str]
+    graph: bool = False
 
 
 class Owner(BaseModel):

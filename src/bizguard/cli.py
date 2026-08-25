@@ -26,7 +26,7 @@ from bizguard.context.compiler import ContextCompiler, ContextPack
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.repository import KnowledgeRepository
-from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
+from bizguard.knowledge.search import HybridSearch
 from bizguard.semantic.models import load_catalog
 from bizguard.semantic.required_tests import select_required_tests
 from bizguard.symbols.service import SymbolService
@@ -106,6 +106,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_parser = subparsers.add_parser("verify-install")
     verify_parser.add_argument("--repository", type=Path, default=None)
     verify_parser.add_argument("--offline", action="store_true")
+    policy_parser = subparsers.add_parser("policy")
+    policy_subparsers = policy_parser.add_subparsers(dest="policy_command", required=True)
+    calibration_parser = policy_subparsers.add_parser("calibration")
+    calibration_subparsers = calibration_parser.add_subparsers(
+        dest="calibration_command", required=True
+    )
+    calibration_verify = calibration_subparsers.add_parser("verify")
+    calibration_verify.add_argument("--bundle", type=Path, required=True)
+    calibration_verify.add_argument("--registry", type=Path)
+    calibration_verify.add_argument("--gates", type=Path)
+    calibration_verify.add_argument("--public-key", type=Path)
+    calibration_verify.add_argument("--json", action="store_true")
     try:
         arguments = parser.parse_args(argv)
     except SystemExit as exc:
@@ -137,6 +149,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _onboarding(arguments)
     if arguments.command == "verify-install":
         return _verify_install(arguments)
+    if arguments.command == "policy":
+        return _policy_calibration(arguments)
     diff_path = arguments.diff
     if not diff_path.is_file() or not diff_path.stat().st_mode:
         print("--diff must identify an existing readable unified diff file", file=sys.stderr)
@@ -205,8 +219,10 @@ def _production_doctor(json_output: bool) -> int:
             "production_config": "ok",
             "governance": _check_governance(settings.governance),
             "mcp": _check_mcp(),
-            "store": _check_store(settings.repository_root),
-            "graph": _check_graph(settings.repository_root),
+            "store": _check_production_stores(settings),
+            "embedding": _check_production_embedding(settings),
+            "auth_provider": _check_auth_provider(settings),
+            "graph": _check_graph(settings.repository_root, settings.governance.catalog),
         }
     ok = all(not status.startswith("failed") for status in checks.values())
     degraded = any(status == "degraded" for status in checks.values())
@@ -252,6 +268,7 @@ def _check_production_config() -> str:
 def _check_governance(governance: object) -> str:
     """Parse every configured governance source instead of checking paths only."""
     from bizguard.policy.invariants import load_invariants
+    from bizguard.policy.calibration import validate_calibration_configuration
     from bizguard.policy.registry import load_registry
     from bizguard.production import GovernancePaths
     from bizguard.rag.injector import load_contract_registry
@@ -267,6 +284,11 @@ def _check_governance(governance: object) -> str:
             governance.invariants,
             governance.contract_registry,
             governance.invariant_knowledge,
+        )
+        validate_calibration_configuration(
+            governance.calibration_gates,
+            governance.calibration_public_key,
+            governance.policy_registry,
         )
         entries = ingest_directory(governance.knowledge, repository)
         return "ok" if entries else "failed"
@@ -307,11 +329,71 @@ def _check_store(root: Path) -> str:
     return "ok"
 
 
-def _check_graph(repositories_root: Path) -> str:
+def _check_production_stores(settings: object) -> str:
+    """Connect to both configured production stores and execute a readiness query."""
+    from bizguard.production import ProductionSettings
+
+    if not isinstance(settings, ProductionSettings):
+        return "failed"
+    approval = None
+    context = None
+    try:
+        approval = settings.approval_store()
+        context = settings.context_store()
+        return "ok" if approval.ping() and context.ping() else "failed"
+    except Exception:
+        return "failed"
+    finally:
+        if approval is not None:
+            approval.close()
+        if context is not None:
+            context.close()
+
+
+def _check_production_embedding(settings: object) -> str:
+    """Execute one real provider query; cached results make repeated diagnostics cheap."""
+    from bizguard.production import ProductionSettings
+
+    if not isinstance(settings, ProductionSettings):
+        return "failed"
+    try:
+        scores = settings.vector_adapter().score_many(
+            "BizGuard production readiness",
+            ["deterministic business policy verification"],
+        )
+        return "ok" if len(scores) == 1 else "failed"
+    except Exception:
+        return "failed"
+
+
+def _check_auth_provider(settings: object) -> str:
+    """Verify that the configured OIDC JWKS endpoint is reachable and non-empty."""
+    import httpx
+
+    from bizguard.production import ProductionSettings
+
+    if not isinstance(settings, ProductionSettings):
+        return "failed"
+    if settings.auth_mode == "static":
+        return "degraded"
+    if settings.auth_jwks_url is None:
+        return "failed"
+    try:
+        response = httpx.get(settings.auth_jwks_url, timeout=5.0)
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return "failed"
+    keys = payload.get("keys") if isinstance(payload, dict) else None
+    return "ok" if isinstance(keys, list) and keys else "failed"
+
+
+def _check_graph(repositories_root: Path, catalog_path: Path | None = None) -> str:
     try:
         from bizguard.graph.indexer import index
 
-        index(repositories_root, "production-readiness")
+        catalog = load_catalog(catalog_path) if catalog_path is not None else None
+        index(repositories_root, "production-readiness", catalog)
     except Exception:
         return "failed"
     return "ok"
@@ -387,6 +469,7 @@ def _bootstrap(root: Path, *, dry_run: bool) -> dict[str, object]:
             "    owner: replace-with-owner\n"
             "    remediation: document the safe migration\n"
             "    required_tests: []\n"
+            "    file_patterns: ['**/*.replace-with-reviewed-extension']\n"
             "    mode: shadow\n"
             "    precision: medium\n"
         ),
@@ -543,17 +626,25 @@ def _context_impact(arguments: argparse.Namespace) -> int:
 
 
 def _knowledge_search(arguments: argparse.Namespace) -> int:
-    from bizguard.production import GovernancePaths
+    import httpx
+
+    from bizguard.production import ProductionSettings
+    from bizguard.rag.embedding import EmbeddingError
 
     root = _repository_root(arguments.repository_root)
     local_knowledge = root / "knowledge/published"
-    knowledge_root = local_knowledge if local_knowledge.is_dir() else GovernancePaths.from_env().knowledge
+    settings = ProductionSettings.from_env()
+    knowledge_root = local_knowledge if local_knowledge.is_dir() else settings.governance.knowledge
     repository = KnowledgeRepository.memory()
     try:
         ingest_directory(knowledge_root, repository)
-        result = HybridSearch(repository, LocalVectorAdapter()).search(
-            SearchRequest(query=arguments.query, scope=arguments.scope, revision=arguments.revision, caller_roles=arguments.roles)
-        )
+        try:
+            result = HybridSearch(repository, settings.vector_adapter()).search(
+                SearchRequest(query=arguments.query, scope=arguments.scope, revision=arguments.revision, caller_roles=arguments.roles)
+            )
+        except (httpx.HTTPError, EmbeddingError):
+            print(json.dumps({"error": "semantic_embedding_provider_unavailable"}))
+            return 2
         payload = result.model_dump(mode="json")
         if result.semantic_channel.startswith("DEGRADED:"):
             payload["retrieval_quality_notice"] = (
@@ -563,6 +654,26 @@ def _knowledge_search(arguments: argparse.Namespace) -> int:
         return 1 if arguments.require_real_embedding and result.semantic_channel.startswith("DEGRADED:") else 0
     finally:
         repository.close()
+
+
+def _policy_calibration(arguments: argparse.Namespace) -> int:
+    """Verify signed real-sample evidence before a policy lifecycle promotion."""
+    from bizguard.policy.calibration import verify_bundle
+    from bizguard.production import GovernancePaths
+
+    governance = GovernancePaths.from_env()
+    try:
+        report = verify_bundle(
+            arguments.bundle,
+            arguments.registry or governance.policy_registry,
+            arguments.gates or governance.calibration_gates,
+            arguments.public_key or governance.calibration_public_key,
+        )
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"eligible": False, "error": str(exc)}, ensure_ascii=False))
+        return 2
+    print(report.model_dump_json())
+    return 0 if report.eligible else 1
 
 
 def _symbol_explain(arguments: argparse.Namespace) -> int:

@@ -10,7 +10,7 @@ BizGuard 是一个面向复杂业务系统的开源验证项目。它通过 MCP�
 
 BizGuard 不替代 Coding Agent、代码评审或领域专家。Agent 继续负责搜索、生成、编辑和测试，BizGuard 专注回答：**这次修改必须知道什么、可能影响谁、满足哪些条件才可以继续？**
 
-当前实现以三个脱敏的 Java 17 微服务 fixture 和一组 Python 业务不变量为验证基座，并提供单实例生产部署基线。内置 Policy 尚未经过任何组织的真实生产审批，不能直接作为生产 Blocking 规则使用。
+当前实现以三个脱敏的 Java 17 微服务 fixture 和一组 Python 业务不变量作为可重现 Demo；生产运行链路使用 OIDC、PostgreSQL、真实 Embedding 和签名 Policy 校准证据。内置 Policy 尚未经过任何组织的真实生产审批，不能直接作为生产 Blocking 规则使用。
 
 ## 为什么需要 BizGuard
 
@@ -171,7 +171,7 @@ flowchart TB
     PACK --> AGENT[Coding Agent]
     DECIDE --> RESULT[Decision + Findings + Evidence<br/>Tests + Approvers + Fingerprint]
 
-    STORE[(SQLite<br/>Context / Approval)] --- PACK
+    STORE[(PostgreSQL<br/>Context / Approval / Audit)] --- PACK
     STORE --- APPROVAL
 ```
 
@@ -250,8 +250,9 @@ unified diff
 | Contract Registry | 把字段和源码映射到服务、能力、Owner 与 Policy | `registry/contracts.yaml` |
 | Invariants | 描述可执行的业务不变量 | `policy/invariants.yaml` |
 | Knowledge Hub | 保存带 front matter、版本、ACL 和有效期的已发布知识 | `knowledge/published/` |
+| Calibration Gates | 定义真实样本数、误报/漏报率和签名公钥 | `policy/calibration-gates.yaml` |
 
-生产 HTTP 模式不会回退到镜像内置的 Demo 数据。catalog、Policy registry、contract registry、invariants 和两类知识目录必须由组织显式挂载，缺少任一项都会拒绝启动。
+生产 HTTP 模式不会回退到镜像内置的 Demo 数据。catalog、Policy registry、contract registry、invariants、两类知识目录、校准阈值和组织公钥必须显式挂载，缺少任一项都会拒绝启动。
 
 ## 接入 Coding Agent
 
@@ -298,7 +299,7 @@ bizguard onboarding --repository /workspace/my-project --bootstrap --dry-run
 bizguard onboarding --repository /workspace/my-project --bootstrap
 ```
 
-生成内容只是 `shadow` 模式的待审核模板。团队必须替换 capability、Owner、Policy、必测命令和证据，然后运行 `bizguard doctor --repository /workspace/my-project --json`；在真实样本完成误报校准前不得升级为 blocking。
+生成内容只是 `shadow` 模式的待审核模板。团队必须替换 capability、Owner、Policy、文件范围、必测命令和证据，然后运行 `bizguard doctor --repository /workspace/my-project --json`；在真实样本完成签名校准、Owner 批准和回退演练前不得升级为 blocking。
 
 ### MCP
 
@@ -360,7 +361,7 @@ biz-guard/
 │   ├── impact/          # BFS 影响分析与必测项推导
 │   ├── knowledge/       # 知识摄取、治理过滤和混合检索
 │   ├── policy/          # Policy registry、生命周期与 Validators
-│   ├── workflow/        # 审批状态机和 SQLite 存储
+│   ├── workflow/        # 审批状态机与 SQLite/PostgreSQL 存储
 │   ├── ci/              # CI 复检与可信测试 runner
 │   └── cli.py           # CLI 入口
 ├── agents_mcp/          # FastMCP 工具、资源、认证和 HTTP 服务
@@ -396,23 +397,25 @@ python scripts/run_benchmark.py \
 
 ## 生产运行
 
-BizGuard 可作为带 Bearer Token 的 Streamable HTTP MCP 服务运行，当前生产基线包括：
+BizGuard 可作为带 OIDC Bearer JWT 的 Streamable HTTP MCP 服务运行，当前生产基线包括：
 
 - 非 root、只读根文件系统和最小 Linux capabilities 的容器；
 - 只读挂载的受管仓库与组织治理目录；
-- Context Pack 和审批的 SQLite 持久化；
-- `/healthz`、`/readyz`、Host/Origin 限制和静态 Token 认证；
+- Context Pack、审批和审计事件的 PostgreSQL 共享持久化与多实例并发安全；
+- `/healthz`、会检查存储的 `/readyz`、Host/Origin 限制和 OIDC/JWKS 认证；
+- 智谱 `embedding-3` 的真实语义检索通道，生产不静默降级为词法向量；
+- Policy 升级所需的 Ed25519 签名样本、Owner 批准和回退演练门禁；
 - 绑定 revision 的必需测试证据、审计记录和 CI 复算。
 
 完整的配置项、Compose 启动、TLS/密钥边界、审批接入、shadow → warning → blocking 发布流程和回退要求见 [PRODUCTION.md](PRODUCTION.md)。
 
-## 当前限制
+## 生产仍需组织完成的项目
 
 - Java 分析能力只在 `coupon-core`、`coupon-contract`、`merchant-service` 三个脱敏 fixture 上验证，不代表覆盖完整 Java 生态。
 - 内置 Policy 和阈值仅用于仓库验证；新组织必须先用真实样本校准，并经过 Owner 审核与回退演练。
-- SQLite 只支持单服务实例；多 Pod、多区高可用需要替换为组织级共享存储 Provider。
-- 目标 embedding 模型是智谱 `embedding-3`；离线模式降级为本地词法向量适配器，并在结果中标记 `DEGRADED`。
-- 候选符号使用显式 `hint_symbols` 优先、词法与本地向量融合排序；离线向量仍是降级语义能力，低置信度时会返回多个候选或 unknown。
+- 生产组织必须提供真实仓库、OIDC、PostgreSQL、Embedding 凭据和签名校准数据，并按 [生产验收清单](PRODUCTION.md#9-上线验收清单) 在本组织环境证明。
+- 离线 Demo 会使用本地词法向量并标记 `DEGRADED`；这个结果不代表真实 Embedding 的召回质量。
+- 水平扩展需由部署方提供 PostgreSQL HA、PITR、负载均衡、监控和值班制度；Compose 仅是可重现部署参考。
 - 动态调用、反射和未登记下游无法靠静态分析完全证明；这些边界会转为审批，而不是自动放行。
 
 ## 开发与贡献

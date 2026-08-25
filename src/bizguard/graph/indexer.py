@@ -13,10 +13,14 @@ from bizguard.analyzers.java_spring import JavaFact, analyze
 from bizguard.analyzers.openapi_proto import analyze_openapi, analyze_proto
 from bizguard.graph.ids import db_id
 from bizguard.graph.models import EdgeKind, GraphEdge, GraphNode, GraphSnapshot, NodeKind
+from bizguard.semantic.models import SemanticCatalog, load_catalog
 
 
-def index(repos: Path, revision: str) -> GraphSnapshot:
+def index(
+    repos: Path, revision: str, catalog: SemanticCatalog | None = None
+) -> GraphSnapshot:
     """Build a graph snapshot from repository source and contract files."""
+    catalog = catalog or load_catalog(Path(__file__).parents[1] / "semantic/catalog.yaml")
     nodes: dict[str, GraphNode] = {}
     edges: list[GraphEdge] = []
     facts: list[tuple[str, Path, JavaFact]] = []
@@ -69,7 +73,7 @@ def index(repos: Path, revision: str) -> GraphSnapshot:
     _add_persistence_edges(facts, node, edge)
     _add_call_edges(facts, edge)
     _add_manual_edges(repos / "bizguard-manual-edges.yaml", nodes, node, edge)
-    _add_business_nodes(nodes, node, edge)
+    _add_business_nodes(nodes, node, edge, catalog)
     digest = content_digest(repos)
     return GraphSnapshot(
         revision,
@@ -181,19 +185,59 @@ def _add_manual_edges(
             )
 
 
-def _add_business_nodes(nodes: dict[str, GraphNode], node: object, edge: object) -> None:
-    capability = "capability://coupon-redemption"
-    owner = "owner://coupon-platform"
-    invariant = "invariant://redeem-idempotency-key-required"
-    node(capability, NodeKind.BUSINESS, "coupon redemption")  # type: ignore[operator]
-    node(owner, NodeKind.ORGANIZATION, "Coupon Platform")  # type: ignore[operator]
-    node(invariant, NodeKind.BUSINESS, "idempotency key required")  # type: ignore[operator]
-    for identifier, graph_node in list(nodes.items()):
-        if graph_node.kind == NodeKind.DEPLOYMENT:
-            edge(identifier, capability, EdgeKind.BELONGS_TO_CAPABILITY, "catalog://semantic/catalog.yaml#coupon_redemption", "catalog")  # type: ignore[operator]
-    edge(capability, owner, EdgeKind.OWNED_BY, "catalog://semantic/catalog.yaml#coupon_redemption", "catalog")  # type: ignore[operator]
-    edge(invariant, capability, EdgeKind.BELONGS_TO_CAPABILITY, "catalog://semantic/catalog.yaml#redeem_idempotency_key_required", "catalog")  # type: ignore[operator]
-    edge(capability, invariant, EdgeKind.PROTECTED_BY, "catalog://semantic/catalog.yaml#redeem_idempotency_key_required", "catalog")  # type: ignore[operator]
+def _add_business_nodes(
+    nodes: dict[str, GraphNode],
+    node: object,
+    edge: object,
+    catalog: SemanticCatalog,
+) -> None:
+    """Attach only capabilities explicitly selected by the organization catalog."""
+    graph_capabilities = [capability for capability in catalog.capabilities if capability.graph]
+    if not graph_capabilities:
+        raise ValueError("semantic catalog must select at least one graph capability")
+    owners = {owner.id: owner for owner in catalog.owners}
+    for capability in graph_capabilities:
+        capability_id = f"capability://{capability.id.replace('_', '-')}"
+        owner_id = f"owner://{capability.owner.replace('_', '-')}"
+        owner = owners.get(capability.owner)
+        evidence = f"catalog://semantic/catalog.yaml#{capability.id}"
+        node(capability_id, NodeKind.BUSINESS, capability.name)  # type: ignore[operator]
+        node(  # type: ignore[operator]
+            owner_id,
+            NodeKind.ORGANIZATION,
+            owner.name if owner is not None else capability.owner,
+        )
+        for repository in capability.repositories:
+            deployment_id = f"service://{repository}"
+            if deployment_id in nodes:
+                edge(  # type: ignore[operator]
+                    deployment_id,
+                    capability_id,
+                    EdgeKind.BELONGS_TO_CAPABILITY,
+                    evidence,
+                    "catalog",
+                )
+        edge(capability_id, owner_id, EdgeKind.OWNED_BY, evidence, "catalog")  # type: ignore[operator]
+        for invariant in catalog.invariants:
+            if invariant.capability != capability.id:
+                continue
+            invariant_id = f"invariant://{invariant.id.replace('_', '-')}"
+            invariant_evidence = f"catalog://semantic/catalog.yaml#{invariant.id}"
+            node(invariant_id, NodeKind.BUSINESS, invariant.statement)  # type: ignore[operator]
+            edge(  # type: ignore[operator]
+                invariant_id,
+                capability_id,
+                EdgeKind.BELONGS_TO_CAPABILITY,
+                invariant_evidence,
+                "catalog",
+            )
+            edge(  # type: ignore[operator]
+                capability_id,
+                invariant_id,
+                EdgeKind.PROTECTED_BY,
+                invariant_evidence,
+                "catalog",
+            )
 
 
 def _kind_for_id(identifier: str) -> NodeKind:

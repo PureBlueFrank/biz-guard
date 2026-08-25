@@ -5,13 +5,15 @@ from pathlib import Path
 import yaml  # type: ignore[import-untyped]
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .lifecycle import PolicyMode
 
 
 class PolicyDefinition(BaseModel):
     """Describe a registered policy and its enforcement metadata."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str
     validator: str
@@ -20,6 +22,7 @@ class PolicyDefinition(BaseModel):
     owner: str
     remediation: str
     required_tests: list[str] = Field(default_factory=list)
+    file_patterns: list[str] = Field(min_length=1)
     mode: PolicyMode = PolicyMode.DRAFT
     precision: Literal["high", "medium", "low"] = "medium"
 

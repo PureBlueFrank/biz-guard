@@ -451,3 +451,28 @@ def test_store_supports_concurrent_http_workers(tmp_path: Path) -> None:
         )
     assert len(store.events("ctx-concurrent")) == 20
     store.close()
+
+
+def test_atomic_store_mutation_merges_stale_multi_instance_cosigns(tmp_path: Path) -> None:
+    database = tmp_path / "approvals.db"
+    first_store = SqliteApprovalStore(database)
+    second_store = SqliteApprovalStore(database)
+    request = ApprovalService(first_store).create(
+        ApprovalRequest(
+            change_context_id="ctx-cross-instance",
+            policy_revision="production-v1",
+            decision_fingerprint="b" * 64,
+            approvers=("owner-a", "owner-b"),
+            required_cosigns=2,
+        )
+    )
+    stale_copy = request.model_copy(deep=True)
+    ApprovalService(first_store).approve(request, "owner-a")
+    ApprovalService(second_store).approve(stale_copy, "owner-b")
+
+    restored = ApprovalService(first_store).create(request.model_copy(deep=True))
+    assert restored.approvals == {"owner-a", "owner-b"}
+    assert restored.state is ApprovalState.APPROVED
+    assert len(first_store.events(request.change_context_id)) == 4
+    first_store.close()
+    second_store.close()

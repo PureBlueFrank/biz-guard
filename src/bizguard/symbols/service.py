@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from bizguard.graph.indexer import index
+from bizguard.semantic.models import SemanticCatalog, load_catalog
 
 
 class SymbolExplanation(BaseModel):
@@ -22,11 +23,16 @@ class SymbolExplanation(BaseModel):
 class SymbolService:
     """Resolve read-only symbol explanations from repository graphs."""
 
-    def __init__(self, repositories_root: Path) -> None:
+    def __init__(
+        self, repositories_root: Path, catalog: SemanticCatalog | None = None
+    ) -> None:
         self._root = repositories_root
+        self._catalog = catalog or load_catalog(
+            Path(__file__).parents[1] / "semantic/catalog.yaml"
+        )
 
     def explain(self, symbol: str, revision: str) -> SymbolExplanation:
-        snapshot = index(self._root, revision)
+        snapshot = index(self._root, revision, self._catalog)
         node = next((item for item in snapshot.nodes if item.id == symbol), None)
         if node is None:
             raise ValueError(f"symbol is not indexed: {symbol}")

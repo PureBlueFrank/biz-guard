@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from hashlib import sha256
 from pathlib import Path
 import secrets
 from threading import RLock
-from typing import Literal
+from typing import Any, Literal
 
+import httpx
+import jwt
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
@@ -21,20 +24,21 @@ from starlette.responses import JSONResponse
 
 from bizguard.change.evaluator import ChangeEvaluator
 from bizguard.change.models import ChangeDecision, EvaluationRequest
-from bizguard.change.store import ChangeContextStore
+from bizguard.change.store import ChangeContextStore, ContextStore
 from bizguard.context.compiler import ContextCompiler, ContextPack
 from bizguard.decision import ChangeSafetyCard, evaluate_change
 from bizguard.impact.service import ImpactService
 from bizguard.knowledge.ingest import ingest_directory
 from bizguard.knowledge.models import SearchRequest
 from bizguard.knowledge.repository import KnowledgeRepository
-from bizguard.knowledge.search import HybridSearch, LocalVectorAdapter
+from bizguard.knowledge.search import HybridSearch
 from bizguard.production import ProductionSettings
+from bizguard.rag.embedding import EmbeddingError
 from bizguard.semantic.models import load_catalog
 from bizguard.semantic.required_tests import select_required_tests
 from bizguard.symbols.service import SymbolService
 from bizguard.workflow.approval import ApprovalRequest, ApprovalService
-from bizguard.workflow.store import SqliteApprovalStore
+from bizguard.workflow.store import ApprovalStore, SqliteApprovalStore
 
 
 _ROOT = Path(__file__).parents[1]
@@ -49,7 +53,7 @@ class _StaticTokenVerifier:
             raise ValueError("HTTP token verifier requires an API token")
         self._token = settings.api_token
         self._identity = settings.identity
-        self._roles = list(settings.roles)
+        self._roles = sorted(set(settings.roles) | set(settings.required_scopes))
 
     async def verify_token(self, token: str) -> AccessToken | None:
         if not secrets.compare_digest(token, self._token):
@@ -62,6 +66,71 @@ class _StaticTokenVerifier:
         )
 
 
+class _OidcTokenVerifier:
+    """Validate issuer, audience, signature, expiry, scopes, and caller identity."""
+
+    def __init__(self, settings: ProductionSettings) -> None:
+        if not settings.auth_jwks_url or not settings.auth_audience or not settings.issuer_url:
+            raise ValueError("OIDC verifier requires JWKS, audience, and issuer settings")
+        self._issuer = settings.issuer_url
+        self._audience = settings.auth_audience
+        self._algorithms = list(settings.auth_algorithms)
+        self._required_scopes = set(settings.required_scopes)
+        self._jwk_client = jwt.PyJWKClient(
+            settings.auth_jwks_url,
+            cache_keys=True,
+            cache_jwk_set=True,
+            lifespan=300,
+            timeout=5,
+        )
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        return await asyncio.to_thread(self._verify_token, token)
+
+    def _verify_token(self, token: str) -> AccessToken | None:
+        try:
+            signing_key = self._jwk_client.get_signing_key_from_jwt(token)
+            claims: dict[str, Any] = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=self._algorithms,
+                audience=self._audience,
+                issuer=self._issuer,
+                options={"require": ["exp", "iat", "sub"]},
+            )
+            subject = claims.get("sub")
+            if not isinstance(subject, str) or not subject:
+                return None
+            scopes = _claim_values(claims.get("scope")) | _claim_values(claims.get("scp"))
+            roles = _claim_values(claims.get("roles"))
+            if not self._required_scopes.issubset(scopes):
+                return None
+            client_id = claims.get("azp") or claims.get("client_id") or subject
+            expires_at = claims.get("exp")
+            return AccessToken(
+                token=token,
+                client_id=str(client_id),
+                subject=subject,
+                scopes=sorted(scopes | roles),
+                expires_at=int(expires_at) if isinstance(expires_at, (int, float)) else None,
+                resource=self._audience,
+            )
+        except (jwt.InvalidTokenError, jwt.PyJWKClientError, TypeError, ValueError):
+            return None
+
+
+def _claim_values(value: object) -> set[str]:
+    if isinstance(value, str):
+        return {item for item in value.split() if item}
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return set(value)
+    return set()
+
+
+def _token_verifier(settings: ProductionSettings) -> _StaticTokenVerifier | _OidcTokenVerifier:
+    return _OidcTokenVerifier(settings) if settings.auth_mode == "oidc" else _StaticTokenVerifier(settings)
+
+
 _SETTINGS = ProductionSettings.from_env()
 FastMCPSettings.model_rebuild()
 mcp = FastMCP(
@@ -71,7 +140,7 @@ mcp = FastMCP(
     stateless_http=_SETTINGS.transport == "streamable-http",
     json_response=_SETTINGS.transport == "streamable-http",
     token_verifier=(
-        _StaticTokenVerifier(_SETTINGS)
+        _token_verifier(_SETTINGS)
         if _SETTINGS.transport == "streamable-http"
         else None
     ),
@@ -79,7 +148,7 @@ mcp = FastMCP(
         AuthSettings(
             issuer_url=_SETTINGS.issuer_url,  # type: ignore[arg-type]
             resource_server_url=_SETTINGS.resource_url,  # type: ignore[arg-type]
-            required_scopes=list(_SETTINGS.roles),
+            required_scopes=list(_SETTINGS.required_scopes),
         )
         if _SETTINGS.transport == "streamable-http"
         else None
@@ -97,10 +166,10 @@ _PERSISTENT_WRITE = ToolAnnotations(
     readOnlyHint=False, destructiveHint=False, idempotentHint=True
 )
 
-_approval_store: SqliteApprovalStore | None = None
-_change_store: ChangeContextStore | None = None
+_approval_store: ApprovalStore | None = None
+_change_store: ContextStore | None = None
 _compiler_instance: ContextCompiler | None = None
-_compiler_store: ChangeContextStore | None = None
+_compiler_store: ContextStore | None = None
 _knowledge_repository: KnowledgeRepository | None = None
 _knowledge_signature: tuple[tuple[str, str], ...] | None = None
 _evaluators: dict[tuple[Path, int], ChangeEvaluator] = {}
@@ -123,14 +192,32 @@ def _context_path() -> Path:
 def _approval_service() -> ApprovalService:
     global _approval_store
     if _approval_store is None:
-        _approval_store = SqliteApprovalStore(_approval_path())
+        _approval_store = (
+            _SETTINGS.approval_store()
+            if _SETTINGS.database_url is not None or _SETTINGS.approval_db is not None
+            else SqliteApprovalStore(_approval_path())
+        )
     return ApprovalService(store=_approval_store)
 
 
 def _read_approval(change_context_id: str, policy_revision: str) -> ApprovalRequest | None:
-    if _approval_store is None:
+    temporary_store: ApprovalStore | None = None
+    store = _approval_store
+    if store is None and _SETTINGS.database_url is not None:
+        temporary_store = _SETTINGS.approval_store()
+        store = temporary_store
+    elif store is None:
+        path = _approval_path()
+        if path.is_file() and not Path(f"{path}-wal").exists():
+            temporary_store = SqliteApprovalStore(path, read_only=True)
+            store = temporary_store
+    if store is None:
         return None
-    payload = _approval_store.get_by_context(change_context_id, policy_revision)
+    try:
+        payload = store.get_by_context(change_context_id, policy_revision)
+    finally:
+        if temporary_store is not None:
+            temporary_store.close()
     return ApprovalRequest.model_validate_json(payload) if payload is not None else None
 
 
@@ -148,23 +235,30 @@ def _resolve_repository_root(requested: str | None = None) -> Path:
     return candidate
 
 
-def _change_context_store() -> ChangeContextStore:
+def _change_context_store() -> ContextStore:
     global _change_store
     if _change_store is None:
-        _change_store = ChangeContextStore(_context_path())
+        _change_store = (
+            _SETTINGS.context_store()
+            if _SETTINGS.database_url is not None or _SETTINGS.context_db is not None
+            else ChangeContextStore(_context_path())
+        )
     return _change_store
 
 
 def _authorized_context(change_context_id: str) -> ContextPack:
     """Load a context only when the authenticated caller satisfies its ACL roles."""
-    temporary_store: ChangeContextStore | None = None
+    temporary_store: ContextStore | None = None
     if _change_store is not None:
         store = _change_store
     else:
-        path = _context_path()
-        if not path.is_file():
-            raise ToolError("change context unavailable")
-        temporary_store = ChangeContextStore(path, read_only=True)
+        if _SETTINGS.database_url is not None:
+            temporary_store = _SETTINGS.context_store()
+        else:
+            path = _context_path()
+            if not path.is_file():
+                raise ToolError("change context unavailable")
+            temporary_store = ChangeContextStore(path, read_only=True)
         store = temporary_store
     try:
         payload = store.get(change_context_id)
@@ -307,27 +401,34 @@ def search_team_knowledge(
     query: str, scope: str, revision: str, limit: int = 5
 ) -> dict[str, object]:
     """Search revision-pinned knowledge under server-authenticated caller ACLs."""
-    with _knowledge_lock:
-        result = HybridSearch(_knowledge(), LocalVectorAdapter()).search(
-            SearchRequest(
-                query=query,
-                scope=scope,
-                revision=revision,
-                caller_roles=sorted(_caller_roles()),
-                limit=limit,
+    try:
+        with _knowledge_lock:
+            result = HybridSearch(_knowledge(), _SETTINGS.vector_adapter()).search(
+                SearchRequest(
+                    query=query,
+                    scope=scope,
+                    revision=revision,
+                    caller_roles=sorted(_caller_roles()),
+                    limit=limit,
+                )
             )
-        )
+    except (httpx.HTTPError, EmbeddingError):
+        raise ToolError("semantic embedding provider unavailable") from None
     return result.model_dump(mode="json")
 
 
 @mcp.tool(description="Explain an indexed symbol and its graph evidence. Read-only with no side effects.", annotations=_READ_ONLY)
 def explain_symbol(symbol: str, revision: str) -> dict[str, object]:
     """Return indexed symbol details and graph evidence."""
-    return SymbolService(_configured_repository_root()).explain(symbol, revision).model_dump(mode="json")
+    return SymbolService(
+        _configured_repository_root(), load_catalog(_SETTINGS.governance.catalog)
+    ).explain(symbol, revision).model_dump(mode="json")
 
 
 @mcp.tool(description="Analyze impact paths, unknown boundaries, and required tests from the graph. Read-only.", annotations=_READ_ONLY)
-def analyze_impact(changed_symbol: str, revision: str, capability: str = "coupon_redemption") -> dict[str, object]:
+def analyze_impact(
+    changed_symbol: str, revision: str, capability: str | None = None
+) -> dict[str, object]:
     """Analyze the impact path for an indexed symbol."""
     return _impact_service(_configured_repository_root()).analyze(
         changed_symbol, revision, capability
@@ -418,16 +519,17 @@ def get_change_decision(
         if base_revisions is not None and evaluation_revisions != context_revisions:
             raise ToolError("base_revisions do not match the persisted change context")
         evaluation_revisions = context_revisions
-    approval_reader: SqliteApprovalStore | None = None
+    approval_reader: ApprovalStore | None = None
+    close_approval_reader = False
     approval_path = _approval_path()
     approval_wal = Path(f"{approval_path}-wal")
-    if (
-        context is not None
-        and _approval_store is None
-        and approval_path.is_file()
-        and not approval_wal.exists()
-    ):
-        approval_reader = SqliteApprovalStore(approval_path, read_only=True)
+    if context is not None and _approval_store is None:
+        if _SETTINGS.database_url is not None:
+            approval_reader = _SETTINGS.approval_store()
+            close_approval_reader = True
+        elif approval_path.is_file() and not approval_wal.exists():
+            approval_reader = SqliteApprovalStore(approval_path, read_only=True)
+            close_approval_reader = True
     evaluator = (
         ChangeEvaluator(
             root,
@@ -462,7 +564,7 @@ def get_change_decision(
             )
         )
     finally:
-        if approval_reader is not None:
+        if close_approval_reader and approval_reader is not None:
             approval_reader.close()
 
 
@@ -490,7 +592,9 @@ def symbol_resource(symbol_id: str) -> dict[str, object]:
 
     symbol = unquote(symbol_id)
     try:
-        result = SymbolService(_configured_repository_root()).explain(
+        result = SymbolService(
+            _configured_repository_root(), load_catalog(_SETTINGS.governance.catalog)
+        ).explain(
             symbol,
             "phase3-fixture-v1",
         )
@@ -578,6 +682,13 @@ async def healthz(_request: object) -> JSONResponse:
 async def readyz(_request: object) -> JSONResponse:
     """Return non-secret dependency readiness for deployment probes."""
     checks = _SETTINGS.readiness()
+    try:
+        _approval_service()
+        checks["approval_store"] = _approval_store is not None and _approval_store.ping()
+        checks["context_store"] = _change_context_store().ping()
+    except Exception:
+        checks["approval_store"] = False
+        checks["context_store"] = False
     ready = all(checks.values())
     return JSONResponse(
         {"status": "ready" if ready else "not_ready", "checks": checks},

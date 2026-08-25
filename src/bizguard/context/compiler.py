@@ -13,7 +13,7 @@ from threading import RLock
 import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 
-from bizguard.change.store import ChangeContextStore
+from bizguard.change.store import ContextStore
 from bizguard.impact.service import ImpactReport, ImpactService
 from bizguard.graph.indexer import content_digest, index
 from bizguard.graph.models import GraphSnapshot
@@ -90,7 +90,7 @@ class ContextCompiler:
         knowledge_root: Path | None = None,
         catalog_path: Path | None = None,
         cache: ContextCache | None = None,
-        store: ChangeContextStore | None = None,
+        store: ContextStore | None = None,
         now: Clock = utc_now,
         reuse_index: bool = False,
     ) -> None:
@@ -324,12 +324,12 @@ class ContextCompiler:
 
     def _graph(self, revision: str) -> GraphSnapshot:
         if not self._reuse_index:
-            return index(self._repositories_root, revision)
+            return index(self._repositories_root, revision, self._catalog)
         digest = content_digest(self._repositories_root)
         with self._reuse_lock:
             graph = self._graphs.get(revision)
             if graph is None or graph.content_digest != digest:
-                graph = index(self._repositories_root, revision)
+                graph = index(self._repositories_root, revision, self._catalog)
                 self._graphs[revision] = graph
             return graph
 

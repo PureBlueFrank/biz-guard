@@ -6,11 +6,12 @@
 
 ## 支持范围
 
-仅最新的 `main` 和最新发布版本接受安全修复。生产部署必须使用 Bearer Token、服务端绑定的身份与角色、只读仓库挂载和持久化审批/上下文存储。
+仅最新的 `main` 和最新发布版本接受安全修复。生产部署必须使用 OIDC/JWKS 验证的 Bearer JWT、服务端绑定的身份与角色、只读仓库挂载、PostgreSQL 共享存储和真实 Embedding Provider。
 
 ## 安全默认值
 
-- HTTP 模式缺少强 Token、身份、角色、持久化存储或 Host 白名单时拒绝启动。
+- HTTP 模式缺少 HTTPS issuer/JWKS、audience、scope、身份、角色、PostgreSQL、Embedding 凭据、组织治理制品或 Host 白名单时拒绝启动。
 - 知识 ACL 只使用服务端认证角色，不信任 Tool 参数。
 - CI 不接受“全部测试已完成”布尔断言，只接受按 Test ID 与 revision 绑定的执行证据。
+- Policy 升级只接受组织 Ed25519 公钥验证的真实样本、Owner 批准和回退演练；示例公钥不具备生产资格。
 - 解析、能力推断或影响分析不完整时保持非放行。

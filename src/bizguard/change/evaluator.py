@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from fnmatch import fnmatchcase
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -30,20 +31,6 @@ from bizguard.workflow.state_machine import ApprovalState
 from bizguard.workflow.store import ApprovalStore
 
 _PUBLIC_CONTRACT_SUFFIXES = {".proto", ".yaml", ".yml", ".json"}
-
-_ARTIFACT_POLICY_BY_SUFFIX = {
-    ".proto": "published-dto-backward-compatible",
-    ".yaml": "published-dto-backward-compatible",
-    ".yml": "published-dto-backward-compatible",
-    ".json": "published-dto-backward-compatible",
-    ".sql": "redeem-ledger-consistency",
-    ".avsc": "coupon-write-consumes-idempotency-key",
-    ".schema": "coupon-write-consumes-idempotency-key",
-    ".properties": "published-dto-backward-compatible",
-    ".conf": "published-dto-backward-compatible",
-    ".env": "published-dto-backward-compatible",
-}
-
 
 class ChangeEvaluator:
     """Evaluate a multi-file diff into one canonical four-state decision.
@@ -418,11 +405,13 @@ class ChangeEvaluator:
         self, file: ParsedFile, revision_hash: str
     ) -> tuple[list[FindingV2], list[CatalogRequiredTest]]:
         """Validate every governed side of a file change, including type downgrades."""
-        old_policy = self._artifact_policy(file.old_path) if file.old_path else None
-        new_policy = self._artifact_policy(file.new_path) if file.new_path else None
-        policies = {
-            policy.id: policy for policy in (old_policy, new_policy) if policy is not None
-        }
+        old_policies = {
+            policy.id: policy for policy in self._artifact_policies(file.old_path)
+        } if file.old_path else {}
+        new_policies = {
+            policy.id: policy for policy in self._artifact_policies(file.new_path)
+        } if file.new_path else {}
+        policies = old_policies | new_policies
         if not policies:
             return [], []
         try:
@@ -443,32 +432,35 @@ class ChangeEvaluator:
                 for policy in policies.values()
             ], []
 
-        same_artifact_kind = (
-            old_policy is not None
-            and new_policy is not None
-            and old_policy.id == new_policy.id
-            and file.old_path is not None
-            and file.new_path is not None
-            and _artifact_kind(file.old_path) == _artifact_kind(file.new_path)
-        )
         validations: list[tuple[PolicyDefinition, str, str, str | None]] = []
-        if old_policy is not None and not same_artifact_kind:
-            validations.append(
-                (old_policy, file.old_path or "", "", reconstructed.before)
+        for policy_id in sorted(policies):
+            old_policy = old_policies.get(policy_id)
+            new_policy = new_policies.get(policy_id)
+            same_artifact_kind = (
+                old_policy is not None
+                and new_policy is not None
+                and file.old_path is not None
+                and file.new_path is not None
+                and _artifact_kind(file.old_path) == _artifact_kind(file.new_path)
             )
-        if new_policy is not None:
-            baseline = (
-                reconstructed.before
-                if same_artifact_kind
-                else None
-            )
-            validations.append(
-                (new_policy, file.new_path or file.old_path or "", reconstructed.after, baseline)
-            )
-        elif old_policy is not None and not validations:
-            validations.append(
-                (old_policy, file.old_path or "", reconstructed.after, reconstructed.before)
-            )
+            if old_policy is not None and not same_artifact_kind:
+                validations.append(
+                    (old_policy, file.old_path or "", "", reconstructed.before)
+                )
+            if new_policy is not None:
+                baseline = reconstructed.before if same_artifact_kind else None
+                validations.append(
+                    (
+                        new_policy,
+                        file.new_path or file.old_path or "",
+                        reconstructed.after,
+                        baseline,
+                    )
+                )
+            elif old_policy is not None and same_artifact_kind:
+                validations.append(
+                    (old_policy, file.old_path or "", reconstructed.after, reconstructed.before)
+                )
 
         public_change = any(
             path is not None and Path(path).suffix.lower() in _PUBLIC_CONTRACT_SUFFIXES
@@ -486,6 +478,7 @@ class ChangeEvaluator:
                 path,
                 severity=policy.severity,
                 baseline_source=baseline,
+                validator=policy.validator,
             )
             confidence = artifact["confidence"]
             if not isinstance(confidence, (int, float)):
@@ -511,12 +504,14 @@ class ChangeEvaluator:
         ]
         return findings, tests
 
-    def _artifact_policy(self, path: str) -> PolicyDefinition | None:
-        """Select the artifact policy by file suffix, looked up from the registry."""
-        policy_id = _ARTIFACT_POLICY_BY_SUFFIX.get(Path(path).suffix.lower())
-        if policy_id is None:
-            return None
-        return next((item for item in self._registry if item.id == policy_id), None)
+    def _artifact_policies(self, path: str) -> list[PolicyDefinition]:
+        """Select every policy whose organization-owned pattern matches the artifact."""
+        normalized = path.replace("\\", "/")
+        return [
+            policy
+            for policy in self._registry
+            if any(fnmatchcase(normalized, pattern) for pattern in policy.file_patterns)
+        ]
 
     def _impact_boundary(
         self, request: EvaluationRequest, revision: str
@@ -527,7 +522,7 @@ class ChangeEvaluator:
         with self._graph_lock:
             snapshot = self._graph_cache.get(key)
             if snapshot is None or snapshot.content_digest != digest:
-                snapshot = index(request.repository_root, revision)
+                snapshot = index(request.repository_root, revision, self._catalog)
                 self._graph_cache[key] = snapshot
         try:
             changed_symbol = changed_id_from_diff_text(snapshot, request.diff_text, "change")

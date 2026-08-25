@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+from typing import Protocol
 
 from bizguard.knowledge.models import (
     CandidateTrace,
@@ -15,7 +16,19 @@ from bizguard.knowledge.models import (
 )
 from bizguard.knowledge.rerank import rerank
 from bizguard.knowledge.repository import KnowledgeRepository
+from bizguard.rag.embedding import EmbeddingError, TextEmbedder
 from bizguard.semantic.models import SemanticCatalog, load_catalog
+
+
+class VectorAdapter(Protocol):
+    """Batch semantic-scoring seam used after governance filters."""
+
+    model: str
+    cache_version: str
+    semantic_channel: str
+
+    def score_many(self, query: str, documents: list[str]) -> list[float]:
+        """Return one score per document in input order."""
 
 
 class LocalVectorAdapter:
@@ -23,10 +36,35 @@ class LocalVectorAdapter:
 
     model = "embedding-3"
     cache_version = "offline-hash-v1"
+    semantic_channel = "DEGRADED: offline lexical-vector adapter"
 
     def score(self, query: str, document: str) -> float:
         left, right = set(_tokens(query)), set(_tokens(document))
         return len(left & right) / math.sqrt(len(left) * len(right)) if left and right else 0.0
+
+    def score_many(self, query: str, documents: list[str]) -> list[float]:
+        """Score offline documents without network access."""
+        return [self.score(query, document) for document in documents]
+
+
+class EmbeddingVectorAdapter:
+    """Score governed documents with a real batch embedding provider."""
+
+    semantic_channel = "REAL: zhipu embedding-3"
+
+    def __init__(self, embedder: TextEmbedder) -> None:
+        self._embedder = embedder
+        self.model = embedder.model
+        self.cache_version = embedder.cache_version
+
+    def score_many(self, query: str, documents: list[str]) -> list[float]:
+        if not documents:
+            return []
+        vectors = self._embedder.embed([query, *documents])
+        if len(vectors) != len(documents) + 1:
+            raise EmbeddingError("embedder returned a vector count different from its inputs")
+        query_vector = vectors[0]
+        return [_cosine(query_vector, vector) for vector in vectors[1:]]
 
 
 class HybridSearch:
@@ -35,7 +73,7 @@ class HybridSearch:
     def __init__(
         self,
         repository: KnowledgeRepository,
-        vector: LocalVectorAdapter | None = None,
+        vector: VectorAdapter | None = None,
         catalog: SemanticCatalog | None = None,
     ) -> None:
         self._repository = repository
@@ -56,11 +94,15 @@ class HybridSearch:
                 continue
             eligible.append(entry)
             trace.bm25_score = bm25.get(entry.id, 0.0)
-            trace.vector_score = (
-                self._vector.score(request.query, f"{entry.title} {entry.content}")
-                if self._vector
-                else None
+        if self._vector is not None:
+            vector_scores = self._vector.score_many(
+                request.query,
+                [f"{entry.title} {entry.content}" for entry in eligible],
             )
+            if len(vector_scores) != len(eligible):
+                raise EmbeddingError("vector adapter returned a score count different from candidates")
+            for entry, score in zip(eligible, vector_scores, strict=True):
+                traces[entry.id].vector_score = score
         ranked = rerank({entry.id: traces[entry.id] for entry in eligible})
         ids = [trace.id for trace in ranked[: request.limit]]
         selected = [
@@ -80,9 +122,7 @@ class HybridSearch:
             entries=selected,
             traces=list(traces.values()),
             mandatory_policy_ids=mandatory,
-            semantic_channel="DEGRADED: offline lexical-vector adapter"
-            if self._vector
-            else "UNKNOWN",
+            semantic_channel=self._vector.semantic_channel if self._vector else "UNKNOWN",
             embedding_model=self._vector.model if self._vector else None,
             embedding_cache_version=self._vector.cache_version if self._vector else None,
         )
@@ -109,3 +149,13 @@ def _ineligible(entry: KnowledgeEntry, request: SearchRequest) -> str | None:
 
 def _tokens(value: str) -> list[str]:
     return re.findall(r"[\w-]+", value.lower(), flags=re.UNICODE)
+
+
+def _cosine(left: list[float], right: list[float]) -> float:
+    if not left or len(left) != len(right):
+        raise EmbeddingError("embedding vectors must have matching non-empty dimensions")
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if left_norm == 0 or right_norm == 0:
+        raise EmbeddingError("embedding vectors must not be zero")
+    return sum(a * b for a, b in zip(left, right, strict=True)) / (left_norm * right_norm)
